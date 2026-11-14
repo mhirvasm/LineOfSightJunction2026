@@ -14,6 +14,13 @@ stream or replay that photo. Operator Reset clears the shared run and drafts.
 Glasses input, receipt extraction, confirmation/transfers, Send Again, and
 Undo are not implemented. No provider key is needed for these tests.
 
+**Android bridge on this branch:** the native
+[phone-first Android app](apps/mobile/android/README.md) adds continuous handset
+camera streaming through Meta's mock SDK, shared marker status, and an SDK
+selection diagnostic. Receipt actions remain disabled against the current B2
+hub. Its physical phone/glasses checks are tracked separately in
+[issue #6](https://github.com/mhirvasm/LineOfSightJunction2026/issues/6).
+
 B1 was merged into `chore/k0-bootstrap` after the human tested it and
 explicitly requested the merge. B2 is on `feat/b2-target-selection` for
 review; it is not automatically merged.
