@@ -3,13 +3,14 @@ import { createRoot } from 'react-dom/client';
 import targets from '../../../contracts/targets.json';
 import { useHub } from './connection/useHub.js';
 import { PhotoTest, VisionStatus } from './phone/PhotoTest.jsx';
+import { CoffeeMachine } from './CoffeeMachine.jsx';
 import './styles.css';
 
 const money = (record) => record?.total_minor == null ? 'Unreadable' :
   new Intl.NumberFormat('en-IE', { style: 'currency', currency: record.currency }).format(record.total_minor / 100);
 
-function Header({ mode = "fixture" }) {
-  return <header className="topbar"><a className="brand" href="/expense"><span className="brand-mark" aria-hidden="true">L<span>•</span></span>LineOfSight</a><nav aria-label="Pages">{[...Object.values(targets), { route: '/operator', label: 'Operator' }, { route: '/fixture-mobile', label: 'Test phone' }].map((item) => <a key={item.route} href={item.route} aria-current={window.location.pathname === item.route ? 'page' : undefined}>{item.label}</a>)}</nav><span className="mode-badge">{mode.toUpperCase()} CAPTURE</span></header>;
+function Header({ mode = "fixture", badge }) {
+  return <header className="topbar"><a className="brand" href="/expense"><span className="brand-mark" aria-hidden="true">L<span>•</span></span>LineOfSight</a><nav aria-label="Pages">{[...Object.values(targets), { route: '/operator', label: 'Operator' }, { route: '/fixture-mobile', label: 'Test phone' }].map((item) => <a key={item.route} href={item.route} aria-current={window.location.pathname === item.route ? 'page' : undefined}>{item.label}</a>)}</nav><span className="mode-badge">{badge ?? `${mode.toUpperCase()} CAPTURE`}</span></header>;
 }
 
 function Footer({ runId }) {
@@ -23,13 +24,24 @@ function Status({ status, error }) {
 function Connections({ snapshot }) {
   const current = snapshot?.connections;
   return <section className="connection-panel" aria-label="Connected devices"><h2>Shared hub connections</h2><ul>{[
-    ['Phone / test controller', current?.mobile], ['Expenses screen', current?.targets.expenses], ['JSON screen', current?.targets.json], ['Text screen', current?.targets.text],
+    ['Phone / test controller', current?.mobile], ['Expenses screen', current?.targets.expenses], ['JSON screen', current?.targets.json], ['Text screen', current?.targets.text], ['Coffee screen', current?.targets.coffee],
   ].map(([label, connected]) => <li key={label}><span>{label}</span><strong>{current ? (connected ? 'Connected' : 'Not connected') : 'Unknown'}</strong></li>)}</ul><p>All connected pages should show the same hub run number below.</p></section>;
+}
+
+function TextResult({ record, preview = false }) {
+  const corrected = record.text_status === 'ready';
+  return <div className="text-result">
+    <h3>{corrected ? 'AI-corrected text' : 'Original transcription'}</h3>
+    {record.text_status === 'unavailable' && <p className="muted">Cleanup unavailable. Showing the original transcription.</p>}
+    <div className={preview ? 'text-preview' : 'pasted-text'} aria-label={preview ? 'Text preview' : 'Pasted text'} dir="auto">{record.text}</div>
+    {record.summary && <section className="text-summary"><h3>Short summary</h3><p dir="auto">{record.summary}</p></section>}
+    {corrected && record.raw_text && <section className="original-text"><h3>Original transcription</h3><div dir="auto">{record.raw_text}</div></section>}
+  </div>;
 }
 
 function Receipt({ record, targetId }) {
   if (!record) return <div className="empty"><span className="empty-icon" aria-hidden="true">—</span><p>{targetId === 'text' ? 'No pasted text yet' : 'No applied draft'}</p><small>Hold, aim here, then drag right to paste.</small></div>;
-  if (targetId === 'text') return <div className="pasted-text" aria-label="Pasted text" dir="auto">{record.text}</div>;
+  if (targetId === 'text') return <TextResult record={record} />;
   if (targetId === 'json') return <pre>{JSON.stringify(record, null, 2)}</pre>;
   const fields = [
     ['Merchant', record.merchant ?? 'Needs review'], ['Date', record.date ?? 'Needs review'],
@@ -41,7 +53,7 @@ function Receipt({ record, targetId }) {
 
 function CapturePreview({ snapshot, targetId }) {
   if (snapshot?.target_id !== targetId || !snapshot?.can_confirm) return <p className="muted">{snapshot?.text || snapshot?.receipt ? 'Aim here while holding. A compatible capture is required.' : 'No active capture.'}</p>;
-  if (targetId === 'text' || !snapshot.receipt) return <div className="text-preview" aria-label="Text preview" dir="auto">{snapshot.text}</div>;
+  if (targetId === 'text' || !snapshot.receipt) return <TextResult record={snapshot} preview />;
   return <><div className="preview-total">{money(snapshot.receipt)}</div><p className="preview-merchant">{snapshot.receipt.merchant} · {snapshot.receipt.date}</p></>;
 }
 
@@ -76,6 +88,17 @@ function ConnectedTarget({ targetId }) {
     document.addEventListener('visibilitychange', acknowledge);
     return () => { cancelAnimationFrame(frame); document.removeEventListener('visibilitychange', acknowledge); };
   }, [hub.snapshot, targetId]);
+  if (targetId === 'coffee') return <div className="app-shell"><Header badge="SIMULATED APPLIANCE" /><main>
+    <div className="page-heading"><div><p className="eyebrow">REGISTERED APPLIANCE / 40</p><h1>Coffee machine</h1><p className="subtitle">Look. Hold. Swipe right. Your next cup starts here.</p></div><Status status={hub.status} error={hub.error} /></div>
+    <div className="fixture-notice"><strong>Simulated coffee machine</strong><span>Hold while aiming here, then swipe right to turn it on or off. Release to cancel.</span></div>
+    <div className="workspace coffee-workspace">
+      <section className="marker-panel" aria-label="Coffee target marker"><div className="panel-top"><span>YOUR TARGET</span><span>MARKER 40</span></div><div className="marker-tile"><img src={targets.coffee.marker_asset} alt="ArUco DICT_4X4_50 marker 40" width="600" height="600" /></div><h2>Coffee</h2><p>Looking identifies it. Your swipe controls it.</p></section>
+      <section className="card coffee-card"><div className="card-title"><h2>Espresso station</h2><span className={hub.snapshot?.coffee_on ? 'coffee-power on' : 'coffee-power'}>{hub.snapshot?.coffee_on ? 'ON' : 'OFF'}</span></div><CoffeeMachine on={Boolean(hub.snapshot?.coffee_on)} />
+      <h2 className="coffee-state" role="status">{hub.snapshot?.coffee_on ? 'Brewing your coffee' : 'Ready when you are'}</h2>
+      <p className="coffee-hint">{hub.snapshot?.coffee_on ? 'Hold and swipe right again to stop.' : 'Hold and swipe right to start.'}</p>
+      <p className="feedback">{hub.snapshot?.target_id === 'coffee' ? hub.snapshot.feedback : 'Aim the phone or glasses at marker 40.'}</p></section>
+    </div><Connections snapshot={hub.snapshot} /><VisionStatus snapshot={hub.snapshot} />
+  </main><Footer runId={hub.snapshot?.run_id} /></div>;
   return <TargetShell targetId={targetId} {...hub} />;
 }
 
@@ -124,6 +147,7 @@ function App() {
   const path = window.location.pathname;
   if (path === '/operator') return <TestPage operator />;
   if (path === '/fixture-mobile') return <TestPage operator={false} />;
+  if (path === '/coffee') return <ConnectedTarget targetId="coffee" />;
   const targetId = path === '/text' ? 'text' : path === '/json' ? 'json' : 'expenses';
   return new URLSearchParams(window.location.search).has('fixture') ? <FixtureExamples targetId={targetId} /> : <ConnectedTarget targetId={targetId} />;
 }

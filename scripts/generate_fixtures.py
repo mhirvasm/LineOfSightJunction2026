@@ -13,7 +13,7 @@ def generate():
     base = {
         "v": 1, "type": "SNAPSHOT", "run_id": "00000000-0000-4000-8000-000000000001",
         "state": "STOPPED", "source_mode": "fixture", "capture_id": None,
-        "receipt": None, "text": None, "target_id": None, "preview_id": None, "can_confirm": False,
+        "receipt": None, "text": None, "raw_text": None, "summary": None, "text_status": "raw", "target_id": None, "preview_id": None, "can_confirm": False,
         "drafts": {"expenses": None, "json": None, "text": None}, "last_commit": None,
         "feedback": "Fixture example: stopped. Start is not connected yet.", "error": None,
     }
@@ -41,12 +41,14 @@ def generate():
                         text=json.loads((ROOT / "fixtures/text_capture.json").read_text(encoding="utf-8"))["text"],
                         target_id="text", preview_id="00000000-0000-4000-8000-000000000030",
                         can_confirm=True, feedback="Text / drag right to paste (fixture example only)")
+    analysis = json.loads((ROOT / "fixtures/text_analysis.json").read_text(encoding="utf-8"))
+    text_preview.update(raw_text=analysis["raw_text"], text=analysis["corrected_text"], summary=analysis["summary"], text_status="ready")
     snapshots["PREVIEW_text"] = text_preview
     text_applied = deepcopy(text_preview)
     text_applied.update(state="APPLIED", preview_id=None, can_confirm=False,
                         last_commit={"commit_id": text_preview["preview_id"], "target_id": "text", "display_status": "displayed"},
                         feedback="Shown on Text (fixture example only).")
-    text_applied["drafts"]["text"] = {"text": text_preview["text"]}
+    text_applied["drafts"]["text"] = {key: text_preview[key] for key in ("text", "raw_text", "summary", "text_status")}
     snapshots["APPLIED_text"] = text_applied
     applied = deepcopy(snapshots["PREVIEW_json"])
     applied.update(state="APPLIED", preview_id=None, can_confirm=False,

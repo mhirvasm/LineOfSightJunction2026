@@ -29,7 +29,7 @@ async def exercise(port):
             connect(address + "?role=mobile") as mobile, \
             connect(address + "?role=operator") as operator:
         ready = lambda value: value["type"] == "SNAPSHOT" and value["connections"] == {
-            "mobile": True, "targets": {"expenses": True, "json": True, "text": False}, "operators": 1}
+            "mobile": True, "targets": {"expenses": True, "json": True, "text": False, "coffee": False}, "operators": 1}
         sockets = [expenses, json_target, mobile, operator]
         values = await asyncio.gather(*(receive_until(client, ready) for client in sockets))
         assert len({value["run_id"] for value in values}) == 1

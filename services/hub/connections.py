@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-TARGET_IDS = {"expenses", "json", "text"}
+TARGET_IDS = {"expenses", "json", "text", "coffee"}
 
 
 @dataclass(eq=False)
@@ -45,12 +45,17 @@ class Hub:
         self.state = "STOPPED"
         self.receipt = None
         self.text = None
+        self.raw_text = self.summary = None
+        self.text_status = "raw"
         self.capture_id = None
         self.target_id = None
         self.preview_id = None
         self.active_stream_id = None
         self.frame_source = None
-        self.drafts = {target: None for target in sorted(TARGET_IDS)}
+        self.drafts = {target: None for target in ("expenses", "json", "text")}
+        self.coffee_on = False
+        self.coffee_desired = None
+        self.interaction_kind = "content"
         self.capture_records = {}
         self.applied_commit_ids = set()
         self.previous_draft = None
@@ -63,6 +68,10 @@ class Hub:
             "state": self.state, "source_mode": self.workflow.reader.mode,
             "extraction_provider": self.workflow.reader.provider,
             "capture_id": self.capture_id, "receipt": self.receipt, "text": self.text,
+            "raw_text": self.raw_text, "summary": self.summary, "text_status": self.text_status,
+            "interaction_kind": self.interaction_kind, "coffee_on": self.coffee_on,
+            "coffee_desired": self.coffee_desired,
+            "can_select_coffee": self.state in {"READY", "APPLIED"} and self.active_stream_id is not None and self.workflow.fresh_target() == "coffee",
             "target_id": self.target_id, "preview_id": self.preview_id,
             "can_confirm": self.state == "PREVIEW" and self.preview_id is not None and self.workflow.fresh_target() == self.target_id, "drafts": self.drafts,
             "last_commit": self.last_commit, "feedback": self.feedback, "error": None,
@@ -95,6 +104,10 @@ class Hub:
         self.state = "STOPPED"
         self.receipt = None
         self.text = None
+        self.raw_text = self.summary = None
+        self.text_status = "raw"
+        self.interaction_kind = "content"
+        self.coffee_desired = None
         self.capture_id = None
         self.preview_id = None
         self.target_id = None

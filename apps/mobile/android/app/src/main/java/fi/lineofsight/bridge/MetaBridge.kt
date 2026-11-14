@@ -221,7 +221,11 @@ class MetaBridge(private val context: Context, private val parent: CoroutineScop
                     text(title.take(80), style = TextStyle.HEADING)
                     text(detail.take(180))
                     if (action != null) button(
-                        label = if (action.action == "CAPTURE") "Capture" else "Confirm",
+                        label = when (action.action) {
+                            "CAPTURE" -> "Capture"
+                            "SELECT_COFFEE" -> "Select Coffee"
+                            else -> "Confirm"
+                        },
                         style = ButtonStyle.PRIMARY, actionRole = ActionRole.PRIMARY,
                         onClick = { if (epoch == generation) parent.launch { activate(action) } },
                     )

@@ -139,6 +139,7 @@ def create_app() -> FastAPI:
     @application.get("/expense", include_in_schema=False)
     @application.get("/json", include_in_schema=False)
     @application.get("/text", include_in_schema=False)
+    @application.get("/coffee", include_in_schema=False)
     @application.get("/operator", include_in_schema=False)
     @application.get("/fixture-mobile", include_in_schema=False)
     async def target_page():

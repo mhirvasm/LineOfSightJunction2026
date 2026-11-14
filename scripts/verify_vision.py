@@ -51,6 +51,7 @@ class PixelChecks(unittest.TestCase):
         self.assertEqual(detect(camera_frame()).target_id, "expenses")
         self.assertEqual(detect(camera_frame(((20, 360, 240),))).target_id, "json")
         self.assertEqual(detect(camera_frame(((30, 360, 240),))).target_id, "text")
+        self.assertEqual(detect(camera_frame(((40, 360, 240),))).target_id, "coffee")
         self.assertIsNone(detect(camera_frame(((10, 10, 240),))).target_id)
         self.assertTrue(detect(camera_frame(((7, 360, 240),))).unsafe)
         ambiguous = detect(camera_frame(((10, 200, 240), (20, 540, 240))))

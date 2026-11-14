@@ -46,6 +46,28 @@ class ProtocolTest {
         assertNull(ActionPolicy.current(parsed.copy(state = "HOLDING", canConfirm = false, previewId = null), true))
     }
 
+    @Test fun `analysis keeps original and summary while processing cannot confirm`() {
+        val data = JSONObject("""{"v":1,"type":"SNAPSHOT","run_id":"${UUID.randomUUID()}","state":"READING","text_status":"processing","raw_text":"The notes is ready.","text":"The notes is ready.","summary":null,"can_confirm":false}""")
+        val reading = HubSnapshot.parse(data)
+        assertEquals("processing", reading.textStatus)
+        assertNull(ActionPolicy.current(reading, true))
+        data.put("state", "HOLDING").put("text_status", "ready").put("text", "The notes are ready.").put("summary", "Notes are ready.")
+        val ready = HubSnapshot.parse(data)
+        assertEquals("The notes is ready.", ready.rawText)
+        assertEquals("The notes are ready.", ready.text)
+        assertEquals("Notes are ready.", ready.summary)
+        assertEquals("ready", ready.textStatus)
+    }
+
+    @Test fun `coffee selection requires a fresh coffee target and no text capture`() {
+        val ready = snapshot().copy(target = "coffee", canSelectCoffee = true)
+        assertEquals("SELECT_COFFEE", ActionPolicy.current(ready, false)?.action)
+        assertNull(ActionPolicy.current(ready.copy(canSelectCoffee = false), true))
+        val hold = ready.copy(state = "PREVIEW", interactionKind = "coffee", coffeeDesired = true, previewId = "coffee-on", canConfirm = true)
+        assertEquals("CONFIRM", ActionPolicy.current(hold, false)?.action)
+        assertNull(ActionPolicy.current(hold.copy(state = "HOLDING", canConfirm = false, previewId = null), true))
+    }
+
     @Test fun `old confirmation cannot follow a changed target preview or reset run`() {
         val old = snapshot("PREVIEW", "expenses-preview", true)
         val action = requireNotNull(ActionPolicy.current(old, true))

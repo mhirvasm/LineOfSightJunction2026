@@ -37,6 +37,13 @@ data class HubSnapshot(
     val merchant: String? = null,
     val receiptDate: String? = null,
     val text: String? = null,
+    val rawText: String? = null,
+    val summary: String? = null,
+    val textStatus: String = "raw",
+    val interactionKind: String = "content",
+    val coffeeOn: Boolean = false,
+    val coffeeDesired: Boolean = false,
+    val canSelectCoffee: Boolean = false,
 ) {
     companion object {
         fun parse(json: JSONObject): HubSnapshot {
@@ -52,7 +59,10 @@ data class HubSnapshot(
                 json.nullable("preview_id"), json.optBoolean("can_confirm"),
                 json.optString("source_mode", "unknown") + " / " + json.optString("extraction_provider", "unknown"), json.optString("feedback"),
                 vision?.optString("message").orEmpty(), amount, json.nullable("capture_id"),
-                receipt?.nullable("merchant"), receipt?.nullable("date"), json.nullable("text"))
+                receipt?.nullable("merchant"), receipt?.nullable("date"), json.nullable("text"),
+                json.nullable("raw_text"), json.nullable("summary"), json.optString("text_status", "raw"),
+                json.optString("interaction_kind", "content"), json.optBoolean("coffee_on"),
+                json.optBoolean("coffee_desired"), json.optBoolean("can_select_coffee"))
         }
     }
 }
@@ -67,6 +77,9 @@ object ActionPolicy {
         snapshot == null -> null
         snapshot.state == "PREVIEW" && snapshot.canConfirm && snapshot.previewId != null ->
             ActionIntent(snapshot.runId, "CONFIRM", snapshot.previewId)
+        snapshot.state in setOf("READY", "APPLIED") && snapshot.canSelectCoffee && snapshot.target == "coffee" ->
+            ActionIntent(snapshot.runId, "SELECT_COFFEE")
+        snapshot.state in setOf("READY", "APPLIED") && snapshot.target == "coffee" -> null
         snapshot.state in setOf("READY", "APPLIED") && captureAvailable -> ActionIntent(snapshot.runId, "CAPTURE")
         else -> null
     }

@@ -1,21 +1,29 @@
 # LineOfSight
 
-## Current demo: Android text grab and receipts
+## Current demo: text summaries, receipts and Coffee
 
-Use Android 0.3.0 with the hub on the same network. Hold to capture text or a
+Use Android 0.4.0 with the hub on the same network. Hold to capture text or a
 receipt, face a registered destination, and drag right to paste; release cancels.
-Open `/text` (marker 30) for raw transcription, `/expense` (10) for a validated EUR
+Open `/text` (marker 30) for corrected text, summary and original transcription,
+`/expense` (10) for a validated EUR
 receipt, or `/json` (20) for receipt fields or a text object. The destination
 selects the output; no content-mode menu is needed. Text is pasted into the
 receiving webpage. General OS clipboard and third-party app insertion are not
-implemented. Handwriting and glasses checks are still pending.
+implemented. Text-only captures get a second AI pass; receipts bypass it. If the
+second pass fails, the original text remains available with a clear label.
+
+Open `/coffee` (marker 40) for the simulated coffee machine. Aim there before
+holding, then swipe right to start brewing; a fresh hold/swipe stops it. Release
+before swiping cancels. Looking alone does not toggle it. No image extraction or
+real appliance connection is involved. Physical phone checks for this build,
+handwriting and glasses checks are still pending.
 
 Start the configured hub with `.venv/Scripts/python.exe scripts/run_hub.py` on
 Windows, or `python scripts/run_hub.py` in the activated Mac environment. Copy
 `.env.example` to the ignored `.env` and configure live mode/provider locally.
 Never commit keys. Build web changes with `npm --prefix apps/web run build`.
 
-See [raw text build and phone retest](docs/tasks/raw-text-grab.md) for exact checks,
+See [text analysis and Coffee build](docs/tasks/text-analysis-coffee-demo.md) for exact checks,
 startup commands and the prior verified build. Earlier sections below record the
 foundation and original receipt-only setup; the current protocol takes precedence.
 

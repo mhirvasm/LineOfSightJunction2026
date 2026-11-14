@@ -242,6 +242,14 @@ class HubClient(
         if (busy || status != "Connected" || !ActionPolicy.accepts(intent, snapshots.value, captureAvailable)) return false
         val lease = guard.active ?: return false
         if (frame == null || !guard.usable(lease, frame, clock())) return false
+        if (intent.action == "SELECT_COFFEE") {
+            lastCaptureId = captureId
+            busy = true
+            val sent = sendAction("SELECT_COFFEE", captureId = captureId)
+            if (!sent) busy = false
+            onChanged()
+            return sent
+        }
         if (intent.action == "CONFIRM") {
             busy = true
             val sent = sendAction("CONFIRM", intent.previewId, snapshots.value?.captureId)

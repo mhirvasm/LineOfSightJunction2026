@@ -28,6 +28,9 @@ class HubClientTest {
     private class FakeHub : AutoCloseable {
         val server = MockWebServer()
         val uploads = LinkedBlockingQueue<RecordedRequest>()
+        val captureUploads = LinkedBlockingQueue<RecordedRequest>()
+        val actions = LinkedBlockingQueue<JSONObject>()
+        var coffeeReady = false
         var socket: WebSocket? = null
         var run = UUID.randomUUID().toString()
         var stream: String? = null
@@ -46,6 +49,7 @@ class HubClientTest {
                         }
                         override fun onMessage(webSocket: WebSocket, text: String) {
                             val json = JSONObject(text)
+                            if (json.optString("type") == "ACTION") actions.add(json)
                             if (json.optString("type") == "STREAM_STARTED") stream = json.getString("stream_id")
                             if (json.optString("action") == "START") state = "READY"
                             if (json.optString("action") == "STOP") { state = "STOPPED"; stream = null }
@@ -58,6 +62,7 @@ class HubClientTest {
                         MockResponse().setResponseCode(202).setBody("{\"accepted\":true}")
                             .apply { if (delayFrames) setBodyDelay(500, TimeUnit.MILLISECONDS) }
                     }
+                    "/v1/captures" -> { captureUploads.add(request); MockResponse().setResponseCode(202) }
                     else -> MockResponse().setResponseCode(404)
                 }
             }
@@ -66,6 +71,7 @@ class HubClientTest {
         fun snapshot() {
             socket?.send(JSONObject().put("v", 1).put("type", "SNAPSHOT").put("run_id", run).put("state", state)
                 .put("source_mode", "fixture").put("can_confirm", false)
+                .put("target_id", if (coffeeReady) "coffee" else JSONObject.NULL).put("can_select_coffee", coffeeReady)
                 .put("vision", JSONObject().put("stream_id", stream ?: JSONObject.NULL)).toString())
         }
         override fun close() { socket?.close(1000, "test complete"); server.shutdown() }
@@ -142,6 +148,29 @@ class HubClientTest {
                     delay(1700)
                     assertEquals(1, server.server.requestCount)
                     assertNull(client.snapshots.value)
+                    client.disconnect()
+                } finally { scope.cancel() }
+            }
+        } }
+    }
+
+    @Test fun `coffee selection sends its interaction ID without uploading an image`() {
+        newSingleThreadContext("coffee-test").use { thread -> runBlocking(thread) {
+            FakeHub().use { server ->
+                val scope = CoroutineScope(SupervisorJob() + thread)
+                try {
+                    val client = HubClient(scope, { 1000L })
+                    client.connect(server.server.url("/").toString())
+                    withTimeout(5000) { client.snapshots.first { it != null } }
+                    client.startStream("camera_stream")
+                    server.coffeeReady = true; server.snapshot()
+                    val current = withTimeout(5000) { client.snapshots.first { it?.canSelectCoffee == true } }
+                    val id = UUID.randomUUID().toString()
+                    assertTrue(client.perform(requireNotNull(ActionPolicy.current(current, false)), JpegFrame(byteArrayOf(1), 1000), id))
+                    withTimeout(5000) { while (server.actions.none { it.optString("action") == "SELECT_COFFEE" }) delay(10) }
+                    val action = server.actions.first { it.optString("action") == "SELECT_COFFEE" }
+                    assertEquals(id, action.getString("capture_id"))
+                    assertTrue(server.captureUploads.isEmpty())
                     client.disconnect()
                 } finally { scope.cancel() }
             }

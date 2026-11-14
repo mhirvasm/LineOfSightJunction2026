@@ -34,7 +34,7 @@ class HubChecks(unittest.TestCase):
                 "/v1/events?role=mobile", "/v1/events?role=operator",
             ]]
             complete = lambda value: value["connections"] == {
-                "mobile": True, "targets": {"expenses": True, "json": True, "text": False}, "operators": 1}
+                "mobile": True, "targets": {"expenses": True, "json": True, "text": False, "coffee": False}, "operators": 1}
             initial = [snapshot(socket, complete) for socket in sockets]
             run_id = client.get("/health").json()["run_id"]
             self.assertEqual({item["run_id"] for item in initial}, {run_id})

@@ -71,7 +71,7 @@ class ReceiptReader:
     async def __call__(self, image):
         if self.mode == "fixture":
             await asyncio.sleep(.4)
-            return self.fixture()
+            return self.fixture(image)
         if self.provider == "gemini":
             return await self.gemini(image)
         key = os.environ.get("OPENAI_API_KEY", "").strip()
@@ -80,10 +80,7 @@ class ReceiptReader:
         payload = {
             "model": os.environ.get("LOS_OPENAI_MODEL", "gpt-4.1-mini"), "store": False,
             "instructions": self.instructions,
-            "input": [{"role": "user", "content": [
-                {"type": "input_text", "text": self.request_text},
-                {"type": "input_image", "detail": "high", "image_url": "data:image/jpeg;base64," + base64.b64encode(image).decode()},
-            ]}],
+            "input": [{"role": "user", "content": self.openai_content(image)}],
             "text": {"format": {"type": "json_schema", "name": self.schema_name, "strict": True, "schema": self.schema}},
             "max_output_tokens": self.max_output_tokens,
         }
@@ -105,7 +102,19 @@ class ReceiptReader:
                        if part.get("type") == "output_text")
         return self.validate(json.loads(text))
 
-    def fixture(self):
+    def openai_content(self, image):
+        return [
+            {"type": "input_text", "text": self.request_text},
+            {"type": "input_image", "detail": "high", "image_url": "data:image/jpeg;base64," + base64.b64encode(image).decode()},
+        ]
+
+    def gemini_parts(self, image):
+        return [
+            {"text": self.request_text},
+            {"inlineData": {"mimeType": "image/jpeg", "data": base64.b64encode(image).decode()}},
+        ]
+
+    def fixture(self, value=None):
         return validate_receipt(json.loads((ROOT / "fixtures/receipt_expected.json").read_text()))
 
     async def gemini(self, image):
@@ -117,10 +126,7 @@ class ReceiptReader:
             raise ProviderError("Invalid Gemini model name.")
         payload = {
             "systemInstruction": {"parts": [{"text": self.instructions}]},
-            "contents": [{"role": "user", "parts": [
-                {"text": self.request_text},
-                {"inlineData": {"mimeType": "image/jpeg", "data": base64.b64encode(image).decode()}},
-            ]}],
+            "contents": [{"role": "user", "parts": self.gemini_parts(image)}],
             "generationConfig": {"responseMimeType": "application/json", "responseJsonSchema": self.schema,
                                  "maxOutputTokens": max(4096, self.max_output_tokens)},
         }

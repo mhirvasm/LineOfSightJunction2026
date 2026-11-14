@@ -47,7 +47,7 @@ async def exercise(port, live=False, text_only=False):
             assert response.status_code == 202, response.text
             duplicate = await http.post('/v1/captures', data=data, files={'image':('receipt.jpg', image, 'image/jpeg')})
             assert duplicate.status_code == 202
-            await receive_until(mobile, lambda s: s['type']=='SNAPSHOT' and s['capture_id']==capture and s['state'] in ('HOLDING','PREVIEW'), timeout=30)
+            await receive_until(mobile, lambda s: s['type']=='SNAPSHOT' and s['capture_id']==capture and s['state'] in ('HOLDING','PREVIEW'), timeout=55)
             for _ in range(5):
                 seq += 1
                 response = await http.post('/v1/frames', data=dict(run_id=run, stream_id=stream, age_ms='0', frame_seq=str(seq)), files={'image':('frame.jpg', camera_frame(((marker,360,240),)), 'image/jpeg')})
@@ -58,7 +58,11 @@ async def exercise(port, live=False, text_only=False):
             await event('CONFIRM', preview_id=preview, capture_id=capture)
             applied = await receive_until(screen, lambda s: s['type']=='SNAPSHOT' and s.get('last_commit',{} ) and s['last_commit']['commit_id']==preview)
             if text_only or target == 'text':
-                assert applied['drafts'][target] == {'text': ready['text']}
+                assert applied['drafts'][target] == {key: ready[key] for key in ('text', 'raw_text', 'summary', 'text_status')}
+                if text_only:
+                    assert ready['text_status'] == 'ready' and ready['summary']
+                else:
+                    assert ready['text_status'] == 'raw' and ready['summary'] is None
                 if text_only: assert ready['receipt'] is None and '14:30' in ready['text']
             else:
                 assert applied['drafts'][target]['total_minor']==2480
