@@ -33,6 +33,7 @@ data class HubSnapshot(
     val feedback: String,
     val visionMessage: String,
     val amount: String,
+    val captureId: String? = null,
 ) {
     companion object {
         fun parse(json: JSONObject): HubSnapshot {
@@ -46,8 +47,8 @@ data class HubSnapshot(
             return HubSnapshot(run, json.getString("state"), vision?.nullable("stream_id"),
                 vision?.nullable("detected_target_id"), json.nullable("target_id"),
                 json.nullable("preview_id"), json.optBoolean("can_confirm"),
-                json.optString("source_mode", "unknown"), json.optString("feedback"),
-                vision?.optString("message").orEmpty(), amount)
+                json.optString("source_mode", "unknown") + " / " + json.optString("extraction_provider", "unknown"), json.optString("feedback"),
+                vision?.optString("message").orEmpty(), amount, json.nullable("capture_id"))
         }
     }
 }
@@ -62,7 +63,7 @@ object ActionPolicy {
         snapshot == null -> null
         snapshot.state == "PREVIEW" && snapshot.canConfirm && snapshot.previewId != null ->
             ActionIntent(snapshot.runId, "CONFIRM", snapshot.previewId)
-        snapshot.state == "READY" && captureAvailable -> ActionIntent(snapshot.runId, "CAPTURE")
+        snapshot.state in setOf("READY", "APPLIED") && captureAvailable -> ActionIntent(snapshot.runId, "CAPTURE")
         else -> null
     }
 

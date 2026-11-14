@@ -8,8 +8,8 @@ import './styles.css';
 const money = (record) => record?.total_minor == null ? 'Unreadable' :
   new Intl.NumberFormat('en-IE', { style: 'currency', currency: record.currency }).format(record.total_minor / 100);
 
-function Header() {
-  return <header className="topbar"><a className="brand" href="/expense"><span className="brand-mark" aria-hidden="true">L<span>•</span></span>LineOfSight</a><nav aria-label="Pages">{[...Object.values(targets), { route: '/operator', label: 'Operator' }, { route: '/fixture-mobile', label: 'Test phone' }].map((item) => <a key={item.route} href={item.route} aria-current={window.location.pathname === item.route ? 'page' : undefined}>{item.label}</a>)}</nav><span className="mode-badge">FIXTURE MODE</span></header>;
+function Header({ mode = "fixture" }) {
+  return <header className="topbar"><a className="brand" href="/expense"><span className="brand-mark" aria-hidden="true">L<span>•</span></span>LineOfSight</a><nav aria-label="Pages">{[...Object.values(targets), { route: '/operator', label: 'Operator' }, { route: '/fixture-mobile', label: 'Test phone' }].map((item) => <a key={item.route} href={item.route} aria-current={window.location.pathname === item.route ? 'page' : undefined}>{item.label}</a>)}</nav><span className="mode-badge">{mode.toUpperCase()} RECEIPTS</span></header>;
 }
 
 function Footer({ runId }) {
@@ -42,13 +42,13 @@ function TargetShell({ targetId, snapshot, status, error, example = false, child
   const target = targets[targetId];
   const preview = snapshot?.target_id === targetId ? snapshot.receipt : null;
   useEffect(() => { document.title = `${target.label} · LineOfSight`; }, [target.label]);
-  return <div className="app-shell"><Header /><main>
+  return <div className="app-shell"><Header mode={snapshot?.source_mode} /><main>
     <div className="page-heading"><div><p className="eyebrow">REGISTERED DESTINATION / {target.marker_id}</p><h1>{target.label}</h1><p className="subtitle">Look here. Review the receipt. Confirm deliberately.</p></div><Status status={status} error={error} /></div>
-    <div className="fixture-notice"><strong>{example ? 'Predetermined layout example' : 'Shared marker test'}</strong><span>{example ? 'This page shows local sample data and has no hub socket.' : 'This page receives shared updates and phone-frame marker results. Glasses capture, receipt reading, and transfers are not connected yet.'}</span></div>
+    <div className="fixture-notice"><strong>{example ? 'Predetermined layout example' : 'Hold, aim, drag right'}</strong><span>{example ? 'This page shows local sample data and has no hub socket.' : 'Hold to capture. Face this marker, review the amount, then drag right to send. Release to cancel.'}</span></div>
     <div className="workspace">
       <section className="marker-panel" aria-label={`${target.label} target marker`}><div className="panel-top"><span>YOUR TARGET</span><span>MARKER {target.marker_id}</span></div><div className="marker-tile"><img src={target.marker_asset} alt={`ArUco DICT_4X4_50 marker ${target.marker_id}`} width="600" height="600" /></div><h2>{target.label}</h2><p>Keep this marker visible to the glasses.</p><span className="dictionary">DICT_4X4_50 · ID {target.marker_id}</span></section>
       <div className="data-column">
-        <section className="card preview-card"><div className="card-title"><h2>Receipt preview</h2><span className="state-chip">{snapshot?.state ?? 'WAITING'}</span></div><p className="feedback">{snapshot?.feedback ?? 'Waiting for a current hub snapshot.'}</p>{preview ? <><div className="preview-total">{money(preview)}</div><p className="preview-merchant">{preview.merchant ?? 'Merchant needs review'} · {preview.date ?? 'Date needs review'}</p></> : <p className="muted">{snapshot?.receipt ? 'This receipt is directed to another destination.' : 'No active receipt.'}</p>}<div className="preview-footer">{example ? 'Sample only' : 'B1 connection milestone'} · no confirmation action is connected</div></section>
+        <section className="card preview-card"><div className="card-title"><h2>Receipt preview</h2><span className="state-chip">{snapshot?.state ?? 'WAITING'}</span></div><p className="feedback">{snapshot?.feedback ?? 'Waiting for a current hub snapshot.'}</p>{preview ? <><div className="preview-total">{money(preview)}</div><p className="preview-merchant">{preview.merchant ?? 'Merchant needs review'} · {preview.date ?? 'Date needs review'}</p></> : <p className="muted">{snapshot?.receipt ? 'This receipt is directed to another destination.' : 'No active receipt.'}</p>}<div className="preview-footer">{example ? "Sample only" : "Only a deliberate confirmation updates the draft"}</div></section>
         <section className="card applied-card"><div className="card-title"><h2>Applied {targetId === 'json' ? 'JSON' : 'expense draft'}</h2><span className="read-only">READ ONLY</span></div><Receipt record={snapshot?.drafts[targetId]} targetId={targetId} /></section>
       </div>
     </div>
@@ -58,6 +58,18 @@ function TargetShell({ targetId, snapshot, status, error, example = false, child
 
 function ConnectedTarget({ targetId }) {
   const hub = useHub('target', targetId);
+  useEffect(() => {
+    const acknowledge = () => {
+      const snapshot = hub.readSnapshot();
+      const commit = snapshot?.last_commit;
+      if (document.visibilityState === 'visible' && commit?.target_id === targetId && commit.display_status !== 'displayed') {
+        hub.send({ type: 'DISPLAYED', target_id: targetId, commit_id: commit.commit_id });
+      }
+    };
+    const frame = requestAnimationFrame(acknowledge);
+    document.addEventListener('visibilitychange', acknowledge);
+    return () => { cancelAnimationFrame(frame); document.removeEventListener('visibilitychange', acknowledge); };
+  }, [hub.snapshot, targetId]);
   return <TargetShell targetId={targetId} {...hub} />;
 }
 
@@ -92,7 +104,7 @@ function TestPage({ operator }) {
   function reset() {
     if (hub.send({ type: 'RESET' })) setPendingRun(hub.snapshot.run_id);
   }
-  return <div className="app-shell"><Header /><main>
+  return <div className="app-shell"><Header mode={hub.snapshot?.source_mode} /><main>
     <div className="page-heading"><div><p className="eyebrow">PHONE / SCREEN MARKER TEST</p><h1>{title}</h1></div><Status status={hub.status} error={hub.error} /></div>
     <div className="fixture-notice"><strong>{operator ? 'Operator controls' : 'PHONE CAMERA FALLBACK · no glasses connected'}</strong><span>{operator ? 'Reset clears the entire shared run and both drafts.' : 'This browser occupies the phone connection. Its optional photo test uses phone images, not glasses input. Close it before connecting a native app.'}</span></div>
     <Connections snapshot={hub.snapshot} />

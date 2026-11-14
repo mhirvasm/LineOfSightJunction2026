@@ -102,10 +102,7 @@ class VisionService:
                 and self.hub.clients.get("mobile") is frame.owner and self.hub.state != "STOPPED")
 
     def sync_target(self):
-        target_id = self.tracker.locked_id
-        if self.hub.target_id != target_id:
-            self.hub.target_id = target_id
-            self.hub.preview_id = None
+        return self.hub.workflow.refresh()
 
     async def process(self):
         while self.pending is not None:
@@ -139,8 +136,8 @@ class VisionService:
             self.tracker.observe(candidate, now, unsafe=bool(failure or (result and result.unsafe)))
             if self.tracker.locked_id:
                 self.message = f"Stable target: {self.tracker.locked_id}. Fresh frames are required to keep it selected."
-            self.sync_target()
-            if before != self.signature():
+            workflow_changed = self.sync_target()
+            if workflow_changed or before != self.signature():
                 await self.hub.broadcast()
 
     async def expiry_loop(self):
@@ -153,6 +150,6 @@ class VisionService:
                 self.message = "Receiving screen disconnected. No target selected."
             elif self.tracker.expire(monotonic()):
                 self.message = "Target expired. Send fresh camera frames; a single photo is only a recognition check."
-            self.sync_target()
-            if before != self.signature():
+            workflow_changed = self.sync_target()
+            if workflow_changed or before != self.signature():
                 await self.hub.broadcast()

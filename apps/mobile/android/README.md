@@ -1,5 +1,11 @@
 # Android phone-first bridge
 
+Current build 0.2.0: use the [pre-glasses runbook](../../../docs/tasks/pre-glasses-build.md)
+for hold/drag controls, live Gemini extraction, both receiving screens, and the
+physical-glasses foreground service. The original 0.1.0 milestone below records
+the starting bridge and its earlier limitations; it is historical.
+
+
 Task: [A2/A3, issue #6](https://github.com/mhirvasm/LineOfSightJunction2026/issues/6).
 Branch: `feat/android-sdk-bridge`. Agent author: Codex. Responsible human: `mhirvasm`.
 This is the separately requested Android implementation; iOS work stays on its

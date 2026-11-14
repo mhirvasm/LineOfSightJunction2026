@@ -42,6 +42,8 @@ class HubClient(
         private set
     var captureAvailable = false
         private set
+    var lastCaptureId: String? = null
+        private set
     var busy = false
         private set
     var onChanged: () -> Unit = {}
@@ -236,20 +238,20 @@ class HubClient(
         onInvalidated()
     }
 
-    fun perform(intent: ActionIntent, frame: JpegFrame?): Boolean {
+    fun perform(intent: ActionIntent, frame: JpegFrame?, captureId: String = UUID.randomUUID().toString()): Boolean {
         if (busy || status != "Connected" || !ActionPolicy.accepts(intent, snapshots.value, captureAvailable)) return false
         val lease = guard.active ?: return false
         if (frame == null || !guard.usable(lease, frame, clock())) return false
         if (intent.action == "CONFIRM") {
             busy = true
-            val sent = sendAction("CONFIRM", intent.previewId)
+            val sent = sendAction("CONFIRM", intent.previewId, snapshots.value?.captureId)
             // keep one rendered confirmation consumed until a new snapshot or explicit stop.
             if (!sent) busy = false
             onChanged()
             return sent
         }
         val frozen = JpegFrame(frame.bytes.copyOf(), frame.deliveredAtMs)
-        val captureId = UUID.randomUUID().toString()
+        lastCaptureId = captureId
         val base = address ?: return false
         busy = true
         onChanged()
@@ -277,8 +279,17 @@ class HubClient(
         return true
     }
 
-    fun sendAction(action: String, previewId: String? = null): Boolean = send(
-        JSONObject().put("type", "ACTION").put("action", action).apply { if (previewId != null) put("preview_id", previewId) })
+    fun cancelCapture(id: String) {
+        sendAction("CANCEL", captureId = id)
+        busy = false
+        onChanged()
+    }
+
+    fun sendAction(action: String, previewId: String? = null, captureId: String? = null): Boolean = send(
+        JSONObject().put("type", "ACTION").put("action", action).apply {
+            if (previewId != null) put("preview_id", previewId)
+            if (captureId != null) put("capture_id", captureId)
+        })
 
     private fun send(event: JSONObject): Boolean {
         val run = snapshots.value?.runId ?: return false
