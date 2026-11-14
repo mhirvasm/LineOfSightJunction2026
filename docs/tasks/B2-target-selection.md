@@ -141,3 +141,26 @@ server is left running on port 8000.
 Next task after review and the phone marker check: B3, receipt/preview
 workflow, with C3/C4 extraction work still required. A1 remains the separate
 glasses camera/display/input concurrency gate.
+
+## Hotspot connectivity follow-up
+
+After switching to the Samsung Galaxy S23 hotspot, the laptop received a
+new Wi-Fi address. The old address was no longer usable. Phone requests to
+the new address still timed out while the server was running in the
+restricted execution environment. Inspection confirmed the hub was bound
+to all IPv4 interfaces and an enabled Windows Firewall rule already allowed
+the actual Python executable on the active Public profile.
+
+The hub was restarted with approved network-enabled execution using the
+same command (`python -m uvicorn services.hub.app:app --host 0.0.0.0 --port 8000`).
+Two other hotspot devices then received HTTP 200 from `/health`, and one
+loaded `/fixture-mobile` and opened its mobile WebSocket. This verifies
+cross-device HTTP and WebSocket reachability on the current hotspot.
+No firewall rules or network-profile settings were changed. The restart
+intentionally created a new run ID. Private client addresses are omitted.
+
+For a manual launch, run the documented command from a normal Terminal on
+the hub laptop with network access. A runner that permits only local
+connections is insufficient for phone access. Actual physical photo
+readability/orientation, live tracking, Mac, glasses, and band tests remain
+pending; successful health requests do not pass those checks.
