@@ -7,6 +7,30 @@ initially returned no branches/commits. GitHub issue #1 now tracks this
 milestone and is assigned to `mhirvasm`. No merge or deployment was performed.
 There is no existing `main` baseline against which to open a PR.
 
+## Commit and upload status
+
+Verified foundation commit: `02ff158a933b90ddda9064c53258909e0608b301`
+(`chore(demo): initialize the K0 fixture foundation`). It includes the root
+`.gitignore`. No ignored dependencies, builds, temporary screenshots, or
+secret configuration files are tracked.
+
+The first `git push --set-upstream origin chore/k0-bootstrap` attempt
+failed because local Git has no stored GitHub authentication. Interactive
+credential prompts were disabled for that check. The GitHub connector can
+manage issue #1, but its available API tools do not support creating this
+repository's first commit directly on the task branch. A local Git login
+is needed before upload. No `main` commit or merge was created.
+
+After authenticating Git on this computer, the remaining command is:
+
+```powershell
+git push --set-upstream origin chore/k0-bootstrap
+```
+
+On this machine, invoke the bundled Git executable from the commands below
+if `git` remains absent from PATH. Confirm the branch exists on GitHub
+before trying the Mac clone instructions.
+
 ## Runtime and locked dependencies
 
 - Python 3.12.14, Node 24.22.1, npm 11.6.2, Git 2.56.0.windows.4.
@@ -94,8 +118,8 @@ hub drafts start empty; sample JSON is not an applied server transfer.
 
 ## Human handoff
 
-1. Review this task branch and assign the integration owner. Commit/push
-   the reviewed bootstrap branch before trying to clone it on a Mac.
+1. `mhirvasm` reviews this task branch and issue #1. Authenticate local Git
+   and push the committed bootstrap branch before cloning it on a Mac.
 2. Run README's Mac setup and private-network check, recording the actual
    hub IP and matching run_id seen from the phone/other computer.
 3. At the Meta booth, run A1: actual camera + display + ten supported input

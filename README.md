@@ -79,10 +79,10 @@ cd LineOfSightJunction2026
 git switch chore/k0-bootstrap
 ```
 
-**The foundation must first be committed and pushed to that branch by the
-integration owner.** Linking a local Git remote does not upload files. If
+**The bootstrap branch must be uploaded to GitHub before another machine
+can clone it.** Linking a local Git remote does not upload files. If
 the repository is empty or `git switch` reports that the branch is missing,
-stop and have the integration owner share the bootstrap branch. If it has
+stop and have the integration owner share the committed bootstrap branch. If it has
 already been reviewed and merged, use the branch containing this README.
 
 For a private repository, sign in with an account that has access using
