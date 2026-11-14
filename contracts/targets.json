@@ -1,0 +1,16 @@
+{
+  "expenses": {
+    "label": "Expenses",
+    "route": "/expense",
+    "dictionary": "DICT_4X4_50",
+    "marker_id": 10,
+    "marker_asset": "/markers/aruco-10.png"
+  },
+  "json": {
+    "label": "JSON",
+    "route": "/json",
+    "dictionary": "DICT_4X4_50",
+    "marker_id": 20,
+    "marker_asset": "/markers/aruco-20.png"
+  }
+}

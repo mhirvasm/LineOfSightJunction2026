@@ -1,0 +1,265 @@
+{
+  "plan": "demo-first-v2",
+  "tasks": [
+    {
+      "id": "K0",
+      "owner": "B",
+      "subject": "Initialize the demo contract and reproducible fixtures",
+      "dependencies": []
+    },
+    {
+      "id": "A1",
+      "owner": "A",
+      "subject": "Prove camera and wristband selection together",
+      "dependencies": []
+    },
+    {
+      "id": "A2",
+      "owner": "A",
+      "subject": "Create the smallest native bridge and local-network setup",
+      "dependencies": [
+        "A1",
+        "K0"
+      ]
+    },
+    {
+      "id": "A3",
+      "owner": "A",
+      "subject": "Stream correctly oriented frames without a backlog",
+      "dependencies": [
+        "A2",
+        "B1"
+      ]
+    },
+    {
+      "id": "A4",
+      "owner": "A",
+      "subject": "Freeze the receipt image and send one deliberate action",
+      "dependencies": [
+        "A3"
+      ]
+    },
+    {
+      "id": "A5",
+      "owner": "A",
+      "subject": "Render simple cards and stop safely on interruption",
+      "dependencies": [
+        "A4",
+        "B3"
+      ]
+    },
+    {
+      "id": "B1",
+      "owner": "B",
+      "subject": "Build one in-memory hub and connect three clients",
+      "dependencies": [
+        "K0"
+      ]
+    },
+    {
+      "id": "B2",
+      "owner": "B",
+      "subject": "Detect the two markers and choose a stable target",
+      "dependencies": [
+        "B1"
+      ]
+    },
+    {
+      "id": "B3",
+      "owner": "B",
+      "subject": "Implement the receipt and preview state machine",
+      "dependencies": [
+        "B1",
+        "B2"
+      ]
+    },
+    {
+      "id": "B4",
+      "owner": "B",
+      "subject": "Apply once, broadcast, and provide one-level Undo",
+      "dependencies": [
+        "B3"
+      ]
+    },
+    {
+      "id": "B5",
+      "owner": "B",
+      "subject": "Connect all parts and run the short bug checklist",
+      "dependencies": [
+        "A5",
+        "B4",
+        "C2",
+        "C4"
+      ]
+    },
+    {
+      "id": "C1",
+      "owner": "C",
+      "subject": "Build Expenses and JSON from one target component",
+      "dependencies": [
+        "K0"
+      ]
+    },
+    {
+      "id": "C2",
+      "owner": "C",
+      "subject": "Add one clean socket and render server snapshots",
+      "dependencies": [
+        "C1",
+        "B1"
+      ]
+    },
+    {
+      "id": "C3",
+      "owner": "C",
+      "subject": "Implement one extraction interface with fixture and real modes",
+      "dependencies": [
+        "K0"
+      ]
+    },
+    {
+      "id": "C4",
+      "owner": "C",
+      "subject": "Validate the receipt and map it to both destinations",
+      "dependencies": [
+        "C3"
+      ]
+    },
+    {
+      "id": "C5",
+      "owner": "C",
+      "subject": "Add clear feedback and prepare the demo",
+      "dependencies": [
+        "C2",
+        "C4"
+      ]
+    }
+  ],
+  "interfaces": [
+    {
+      "name": "GET /health",
+      "producer": "B1",
+      "consumers": [
+        "A2"
+      ]
+    },
+    {
+      "name": "POST /v1/frames",
+      "producer": "A3",
+      "consumers": [
+        "B2"
+      ]
+    },
+    {
+      "name": "POST /v1/captures",
+      "producer": "A4",
+      "consumers": [
+        "B3"
+      ]
+    },
+    {
+      "name": "ACTION",
+      "producer": "A4",
+      "consumers": [
+        "B3",
+        "B4"
+      ]
+    },
+    {
+      "name": "STREAM_STARTED",
+      "producer": "A3",
+      "consumers": [
+        "B1",
+        "B2"
+      ]
+    },
+    {
+      "name": "DEVICE_PAUSED",
+      "producer": "A5",
+      "consumers": [
+        "B3"
+      ]
+    },
+    {
+      "name": "SNAPSHOT",
+      "producer": "B1",
+      "consumers": [
+        "A5",
+        "C2",
+        "C5"
+      ]
+    },
+    {
+      "name": "DISPLAYED",
+      "producer": "C2",
+      "consumers": [
+        "B4"
+      ]
+    },
+    {
+      "name": "RESET",
+      "producer": "C5",
+      "consumers": [
+        "B1"
+      ]
+    },
+    {
+      "name": "extract_receipt",
+      "producer": "C3",
+      "consumers": [
+        "B3"
+      ]
+    },
+    {
+      "name": "ReceiptRecord validation",
+      "producer": "C4",
+      "consumers": [
+        "B3",
+        "B4",
+        "C1"
+      ]
+    },
+    {
+      "name": "marker PNGs 10 and 20",
+      "producer": "B2",
+      "consumers": [
+        "C1"
+      ]
+    }
+  ],
+  "dependency_waves": [
+    [
+      "A1",
+      "K0"
+    ],
+    [
+      "A2",
+      "B1",
+      "C1",
+      "C3"
+    ],
+    [
+      "A3",
+      "B2",
+      "C2",
+      "C4"
+    ],
+    [
+      "A4",
+      "B3",
+      "C5"
+    ],
+    [
+      "A5",
+      "B4"
+    ],
+    [
+      "B5"
+    ]
+  ],
+  "limitations": [
+    "Planning checks only; no app implementation exists in this workspace.",
+    "Device compatibility and acceptance scenarios are not tested.",
+    "Marker assets and live extraction integration are supplied by implementation tasks, not this pack."
+  ]
+}

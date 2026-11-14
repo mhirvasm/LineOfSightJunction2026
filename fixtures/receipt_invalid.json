@@ -1,0 +1,8 @@
+{
+  "merchant": null,
+  "date": null,
+  "total_minor": null,
+  "currency": "EUR",
+  "tax_minor": null,
+  "needs_review": ["merchant", "date", "total_minor"]
+}

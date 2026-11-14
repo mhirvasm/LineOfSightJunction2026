@@ -1,0 +1,121 @@
+# Local environment and secrets (keep placeholder examples)
+.tools/
+.env
+.env.*
+!.env.example
+!.env.*.example
+!.env.sample
+!.env.template
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+!debug.keystore
+
+# Python dependencies, bytecode, and tooling caches
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.hypothesis/
+.tox/
+.nox/
+*.egg-info/
+.eggs/
+.ipynb_checkpoints/
+
+# JavaScript dependencies and tooling caches
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/*
+!.yarn/patches/
+!.yarn/plugins/
+!.yarn/releases/
+!.yarn/sdks/
+!.yarn/versions/
+.pnp.*
+.vite/
+.next/
+.nuxt/
+.output/
+.svelte-kit/
+.turbo/
+*.tsbuildinfo
+
+# Generated builds and test reports
+build/
+dist/
+coverage/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+test-results/
+playwright-report/
+blob-report/
+
+# Android local configuration and generated output
+.gradle/
+.kotlin/
+.cxx/
+.externalNativeBuild/
+local.properties
+keystore.properties
+*.apk
+*.aab
+
+# iOS local configuration and generated output
+DerivedData/
+Pods/
+.build/
+.swiftpm/
+xcuserdata/
+*.xcuserstate
+*.ipa
+*.dSYM/
+*.dSYM.zip
+*.mobileprovision
+
+# Local camera captures and extraction output; keep synthetic fixtures tracked
+/captures/
+/recordings/
+/runtime/
+/services/hub/captures/
+/services/hub/recordings/
+/services/hub/runtime/
+
+# Logs and temporary files
+*.log
+logs/
+tmp/
+temp/
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Personal editor settings (shared VS Code configuration stays trackable)
+.idea/
+.vscode/*.local.json
+.vscode/*.local.code-workspace
+
+# Operating system metadata
+.DS_Store
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Keep dependency lockfiles, Gradle wrappers, source assets, and fixtures tracked.

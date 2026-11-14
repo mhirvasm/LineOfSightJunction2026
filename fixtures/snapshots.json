@@ -1,0 +1,193 @@
+{
+  "STOPPED": {
+    "v": 1,
+    "type": "SNAPSHOT",
+    "run_id": "00000000-0000-4000-8000-000000000001",
+    "state": "STOPPED",
+    "source_mode": "fixture",
+    "capture_id": null,
+    "receipt": null,
+    "target_id": null,
+    "preview_id": null,
+    "can_confirm": false,
+    "drafts": {
+      "expenses": null,
+      "json": null
+    },
+    "last_commit": null,
+    "feedback": "Fixture example: stopped. Start is not connected yet.",
+    "error": null
+  },
+  "READY": {
+    "v": 1,
+    "type": "SNAPSHOT",
+    "run_id": "00000000-0000-4000-8000-000000000001",
+    "state": "READY",
+    "source_mode": "fixture",
+    "capture_id": null,
+    "receipt": null,
+    "target_id": null,
+    "preview_id": null,
+    "can_confirm": false,
+    "drafts": {
+      "expenses": null,
+      "json": null
+    },
+    "last_commit": null,
+    "feedback": "Ready to capture a receipt.",
+    "error": null
+  },
+  "READING": {
+    "v": 1,
+    "type": "SNAPSHOT",
+    "run_id": "00000000-0000-4000-8000-000000000001",
+    "state": "READING",
+    "source_mode": "fixture",
+    "capture_id": "00000000-0000-4000-8000-000000000002",
+    "receipt": null,
+    "target_id": null,
+    "preview_id": null,
+    "can_confirm": false,
+    "drafts": {
+      "expenses": null,
+      "json": null
+    },
+    "last_commit": null,
+    "feedback": "Reading the frozen receipt image.",
+    "error": null
+  },
+  "HOLDING": {
+    "v": 1,
+    "type": "SNAPSHOT",
+    "run_id": "00000000-0000-4000-8000-000000000001",
+    "state": "HOLDING",
+    "source_mode": "fixture",
+    "capture_id": "00000000-0000-4000-8000-000000000002",
+    "receipt": {
+      "merchant": "Demo Cafe",
+      "date": "2026-11-14",
+      "total_minor": 2480,
+      "currency": "EUR",
+      "tax_minor": null,
+      "needs_review": []
+    },
+    "target_id": null,
+    "preview_id": null,
+    "can_confirm": false,
+    "drafts": {
+      "expenses": null,
+      "json": null
+    },
+    "last_commit": null,
+    "feedback": "Receipt ready. Look toward a destination.",
+    "error": null
+  },
+  "PREVIEW_expenses": {
+    "v": 1,
+    "type": "SNAPSHOT",
+    "run_id": "00000000-0000-4000-8000-000000000001",
+    "state": "PREVIEW",
+    "source_mode": "fixture",
+    "capture_id": "00000000-0000-4000-8000-000000000002",
+    "receipt": {
+      "merchant": "Demo Cafe",
+      "date": "2026-11-14",
+      "total_minor": 2480,
+      "currency": "EUR",
+      "tax_minor": null,
+      "needs_review": []
+    },
+    "target_id": "expenses",
+    "preview_id": "00000000-0000-4000-8000-000000000010",
+    "can_confirm": true,
+    "drafts": {
+      "expenses": null,
+      "json": null
+    },
+    "last_commit": null,
+    "feedback": "Expenses / EUR 24.80 / Confirm (fixture example only)",
+    "error": null
+  },
+  "PREVIEW_json": {
+    "v": 1,
+    "type": "SNAPSHOT",
+    "run_id": "00000000-0000-4000-8000-000000000001",
+    "state": "PREVIEW",
+    "source_mode": "fixture",
+    "capture_id": "00000000-0000-4000-8000-000000000002",
+    "receipt": {
+      "merchant": "Demo Cafe",
+      "date": "2026-11-14",
+      "total_minor": 2480,
+      "currency": "EUR",
+      "tax_minor": null,
+      "needs_review": []
+    },
+    "target_id": "json",
+    "preview_id": "00000000-0000-4000-8000-000000000020",
+    "can_confirm": true,
+    "drafts": {
+      "expenses": null,
+      "json": null
+    },
+    "last_commit": null,
+    "feedback": "JSON / EUR 24.80 / Confirm (fixture example only)",
+    "error": null
+  },
+  "APPLIED": {
+    "v": 1,
+    "type": "SNAPSHOT",
+    "run_id": "00000000-0000-4000-8000-000000000001",
+    "state": "APPLIED",
+    "source_mode": "fixture",
+    "capture_id": "00000000-0000-4000-8000-000000000002",
+    "receipt": {
+      "merchant": "Demo Cafe",
+      "date": "2026-11-14",
+      "total_minor": 2480,
+      "currency": "EUR",
+      "tax_minor": null,
+      "needs_review": []
+    },
+    "target_id": "json",
+    "preview_id": null,
+    "can_confirm": false,
+    "drafts": {
+      "expenses": null,
+      "json": {
+        "merchant": "Demo Cafe",
+        "date": "2026-11-14",
+        "total_minor": 2480,
+        "currency": "EUR",
+        "tax_minor": null,
+        "needs_review": []
+      }
+    },
+    "last_commit": {
+      "commit_id": "00000000-0000-4000-8000-000000000020",
+      "target_id": "json",
+      "display_status": "displayed"
+    },
+    "feedback": "Shown on JSON (fixture example only).",
+    "error": null
+  },
+  "INVALID_RECEIPT": {
+    "v": 1,
+    "type": "SNAPSHOT",
+    "run_id": "00000000-0000-4000-8000-000000000001",
+    "state": "READY",
+    "source_mode": "fixture",
+    "capture_id": null,
+    "receipt": null,
+    "target_id": null,
+    "preview_id": null,
+    "can_confirm": false,
+    "drafts": {
+      "expenses": null,
+      "json": null
+    },
+    "last_commit": null,
+    "feedback": "Required fields unreadable. Recapture the receipt.",
+    "error": "invalid_receipt"
+  }
+}
