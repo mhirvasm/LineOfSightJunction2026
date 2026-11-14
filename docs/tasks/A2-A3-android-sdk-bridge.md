@@ -48,6 +48,10 @@ scope change. A draft PR is for review, not a claim of physical-device success.
 
 ## Verification record
 
+Verified software build checkpoint: `132ecaf5f5162b8523ec8b60359f414d71873aca`.
+This is the compiled/tested source commit, not a known-good hardware build.
+
+
 Build environment prepared locally inside ignored `.tools/`: Azul OpenJDK
 17.0.21, Gradle 8.13, Android command-line tools 19.0, API 36, Build-Tools 36.0.0.
 The SDK/Gradle distributions were downloaded with certificate validation;
@@ -87,6 +91,23 @@ $env:ANDROID_USER_HOME = Join-Path (Get-Location) '.tools/android-user'
   test server on port 5038 listed no connected Android devices. Windows' filtered
   device query likewise showed no Galaxy/Android/ADB phone at that point. USB
   connection/debugging authorization is pending; no handset result is claimed.
+
+## Install without USB
+
+The debug APK can also be downloaded over the demo network. From the repository
+root, the following command serves only the build output directory:
+
+```sh
+python -m http.server 8001 --bind 0.0.0.0 --directory apps/mobile/android/app/build/outputs/apk/debug
+```
+
+Open `http://YOUR-HUB-IP:8001/app-debug.apk` on the phone and install it manually.
+The server was started for this test; HEAD requests to both localhost and the
+laptop's Wi-Fi address returned HTTP 200 for the APK. The existing hub health
+endpoint likewise returned HTTP 200 / ok true. This verifies laptop-side
+serving only; phone download/install and camera behavior remain pending. Keep
+the hotspot on, enter the hub origin on port 8000 in the app, and close other
+mobile/controller tabs. Stop the temporary APK server after installation.
 
 ## Human handoff
 
