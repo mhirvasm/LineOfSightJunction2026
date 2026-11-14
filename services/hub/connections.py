@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-TARGET_IDS = {"expenses", "json"}
+TARGET_IDS = {"expenses", "json", "text"}
 
 
 @dataclass(eq=False)
@@ -44,24 +44,25 @@ class Hub:
         self.run_id = str(uuid4())
         self.state = "STOPPED"
         self.receipt = None
+        self.text = None
         self.capture_id = None
         self.target_id = None
         self.preview_id = None
         self.active_stream_id = None
         self.frame_source = None
-        self.drafts = {"expenses": None, "json": None}
+        self.drafts = {target: None for target in sorted(TARGET_IDS)}
         self.capture_records = {}
         self.applied_commit_ids = set()
         self.previous_draft = None
         self.last_commit = None
-        self.feedback = "Ready. Start the camera and hold to capture a receipt."
+        self.feedback = "Ready. Start the camera and hold to capture text or a receipt."
 
     def snapshot(self):
         return deepcopy({
             "v": 1, "type": "SNAPSHOT", "run_id": self.run_id,
             "state": self.state, "source_mode": self.workflow.reader.mode,
             "extraction_provider": self.workflow.reader.provider,
-            "capture_id": self.capture_id, "receipt": self.receipt,
+            "capture_id": self.capture_id, "receipt": self.receipt, "text": self.text,
             "target_id": self.target_id, "preview_id": self.preview_id,
             "can_confirm": self.state == "PREVIEW" and self.preview_id is not None and self.workflow.fresh_target() == self.target_id, "drafts": self.drafts,
             "last_commit": self.last_commit, "feedback": self.feedback, "error": None,
@@ -93,6 +94,7 @@ class Hub:
             self.vision.invalidate()
         self.state = "STOPPED"
         self.receipt = None
+        self.text = None
         self.capture_id = None
         self.preview_id = None
         self.target_id = None
@@ -149,7 +151,7 @@ class Hub:
                 return False, None
             self.stop_interaction()
             self.state = "READY"
-            self.feedback = "Ready. Hold to capture a receipt."
+            self.feedback = "Ready. Hold to capture text or a receipt."
             return True, None
         if kind in {"STREAM_STARTED", "DEVICE_PAUSED"}:
             if client.role != "mobile":

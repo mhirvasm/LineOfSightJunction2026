@@ -8,14 +8,15 @@ from uuid import UUID, uuid4
 
 import httpx
 
-from .extraction.receipt import ProviderError, ReceiptReader, validate_receipt
+from .extraction.receipt import ProviderError
+from .extraction.content import ContentReader, validate_content
 from .vision.service import FrameRejected
 
 
 class ReceiptWorkflow:
     def __init__(self, hub, reader=None):
         self.hub = hub
-        self.reader = reader or ReceiptReader()
+        self.reader = reader or ContentReader()
         self.task = None
         self.pending = set()
         self.sent_at = None
@@ -32,7 +33,7 @@ class ReceiptWorkflow:
     def clear(self, message="Canceled. Hold to capture again."):
         self.invalidate()
         h = self.hub
-        h.capture_id = h.receipt = h.preview_id = None
+        h.capture_id = h.receipt = h.text = h.preview_id = None
         if h.state != "STOPPED":
             h.state = "READY"
         h.feedback = message
@@ -59,12 +60,16 @@ class ReceiptWorkflow:
                 h.preview_id = None
                 h.state = "HOLDING"
                 h.feedback = "Held. Look at a screen; release to cancel."
+            elif target == "expenses" and not h.receipt:
+                h.preview_id = None
+                h.state = "HOLDING"
+                h.feedback = "Expenses needs a readable EUR receipt. Aim at Text or JSON; release to cancel."
             else:
                 if changed_target or not h.preview_id:
                     h.preview_id = str(uuid4())
                 h.state = "PREVIEW"
-                amount = h.receipt["total_minor"] / 100
-                h.feedback = f"{target.title()} / EUR {amount:.2f} / drag right to send"
+                summary = f"EUR {h.receipt['total_minor'] / 100:.2f}" if h.receipt and target != "text" else f"{len(h.text)} characters"
+                h.feedback = f"{target.title()} / {summary} / drag right to send"
         if h.last_commit and h.last_commit["display_status"] == "waiting":
             if (self.sent_at is not None and monotonic() - self.sent_at > 3) or f"target:{h.last_commit['target_id']}" not in h.clients:
                 h.last_commit["display_status"] = "not_confirmed"
@@ -93,10 +98,10 @@ class ReceiptWorkflow:
         if len(h.capture_records) >= 1000:
             raise FrameRejected("Capture limit reached. Reset explicitly.")
         if h.state not in {"READY", "APPLIED"} or not h.active_stream_id:
-            raise FrameRejected("Finish or cancel the current receipt first.")
+            raise FrameRejected("Finish or cancel the current capture first.")
         h.capture_records[capture] = {"digest": digest, "status": "reading"}
-        h.capture_id, h.receipt, h.preview_id = capture, None, None
-        h.state, h.feedback = "READING", "Reading receipt. Release to cancel."
+        h.capture_id, h.receipt, h.text, h.preview_id = capture, None, None, None
+        h.state, h.feedback = "READING", "Reading text. Keep holding; release to cancel."
         self.task = asyncio.create_task(self.read(run, capture, image, owner))
         self.pending.add(self.task)
         self.task.add_done_callback(self.pending.discard)
@@ -104,16 +109,16 @@ class ReceiptWorkflow:
     async def read(self, run, capture, image, owner):
         h = self.hub
         try:
-            record = validate_receipt(await asyncio.wait_for(self.reader(image), 25))
+            record = validate_content(await asyncio.wait_for(self.reader(image), 25))
             failure = None
         except asyncio.CancelledError:
             return
         except ProviderError as error:
             record, failure = None, str(error)
         except (TimeoutError, httpx.TimeoutException):
-            record, failure = None, "Receipt reading timed out. Check the hub internet connection, then capture again."
+            record, failure = None, "Text reading timed out. Check the hub internet connection, then capture again."
         except Exception:
-            record, failure = None, "Could not read receipt. Check live configuration or recapture a clearer image."
+            record, failure = None, "Could not read text. Capture a shorter, clearer block and check live configuration."
         if run != h.run_id or h.capture_id != capture or h.clients.get("mobile") is not owner or h.state != "READING":
             return
         self.task = None
@@ -121,7 +126,7 @@ class ReceiptWorkflow:
         if failure:
             self.clear(failure)
         else:
-            h.receipt, h.state = record, "HOLDING"
+            h.receipt, h.text, h.state = record["receipt"], record["text"], "HOLDING"
             self.refresh()
         await h.broadcast()
 
@@ -138,7 +143,7 @@ class ReceiptWorkflow:
                 return True, None
             return False, None
         if client.role != "mobile":
-            return False, ("forbidden", "Only the active phone can change receipts.")
+            return False, ("forbidden", "Only the active phone can change captures.")
         action = event.get("action")
         if action == "CANCEL":
             capture = event.get("capture_id")
@@ -160,7 +165,7 @@ class ReceiptWorkflow:
                 return False, None
             old_preview = h.preview_id
             self.refresh()
-            if h.state != "PREVIEW" or preview != h.preview_id or not h.receipt or not h.target_id:
+            if h.state != "PREVIEW" or preview != h.preview_id or not h.text or not h.target_id:
                 if event.get("capture_id") == h.capture_id or preview == old_preview:
                     self.clear("Canceled: destination or preview expired.")
                     return True, None
@@ -169,7 +174,7 @@ class ReceiptWorkflow:
                 return False, ("capacity", "Reset explicitly before more transfers.")
             target = h.target_id
             h.previous_draft = (target, deepcopy(h.drafts[target]))
-            h.drafts[target] = deepcopy(h.receipt)
+            h.drafts[target] = deepcopy(h.receipt) if target != "text" and h.receipt else {"text": h.text}
             h.applied_commit_ids.add(preview)
             h.last_commit = {"commit_id": preview, "target_id": target, "display_status": "waiting"}
             self.sent_at = monotonic()
@@ -182,7 +187,7 @@ class ReceiptWorkflow:
             h.previous_draft = h.last_commit = None
             self.clear("Previous draft restored. Hold to capture again.")
             return True, None
-        if action == "SEND_AGAIN" and h.state == "APPLIED" and h.receipt:
+        if action == "SEND_AGAIN" and h.state == "APPLIED" and h.text:
             h.state, h.preview_id = "HOLDING", None
             self.refresh()
             return True, None

@@ -10,7 +10,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import scripts.run_hub  # loads local configuration without printing it
-from services.hub.extraction.receipt import ReceiptReader
+from services.hub.extraction.content import ContentReader
 
 
 def receipt_jpeg(amount):
@@ -23,11 +23,13 @@ def receipt_jpeg(amount):
 
 
 async def main():
-    reader = ReceiptReader("live")
+    reader = ContentReader("live")
     for amount, minor in (("24.80", 2480), ("31.90", 3190)):
         jpeg = receipt_jpeg(amount)
         started = monotonic()
-        record = await reader(jpeg)
+        content = await reader(jpeg)
+        assert amount in content["text"]
+        record = content["receipt"]
         assert record['total_minor'] == minor, 'Changed total was not read correctly'
         assert record['date'] == '2026-11-14'
         assert record['merchant'].casefold() == 'demo cafe'

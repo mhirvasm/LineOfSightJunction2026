@@ -20,6 +20,19 @@ class HoldGestureTest {
         down(); gesture.update(snapshot("HOLDING")); gesture.move(100f, 0f); gesture.up()
         assertEquals(listOf("capture", "cancel:c"), actions)
     }
+    @Test fun textPasteToIncompatibleExpensesCancels() {
+        down()
+        gesture.update(snapshot("HOLDING").copy(target = "expenses", amount = "", text = "A note"))
+        gesture.move(100f, 0f); gesture.up()
+        assertEquals(listOf("capture", "cancel:c"), actions)
+    }
+
+    @Test fun textWithoutReceiptSendsOnce() {
+        down()
+        gesture.update(snapshot("PREVIEW", "text-preview").copy(target = "text", amount = "", text = "A note"))
+        gesture.move(100f, 0f); gesture.move(200f, 0f); gesture.up()
+        assertEquals(listOf("capture", "confirm:text-preview"), actions)
+    }
     @Test fun readyMovementMustBeFreshAndSendOnce() {
         down(); gesture.move(200f, 0f); gesture.update(snapshot("PREVIEW", "p"))
         gesture.move(210f, 0f)

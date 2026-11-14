@@ -52,6 +52,13 @@ def validate_receipt(record):
 
 
 class ReceiptReader:
+    instructions = INSTRUCTIONS
+    schema = SCHEMA
+    schema_name = "receipt"
+    request_text = "Read this receipt."
+    max_output_tokens = 1000
+    validate = staticmethod(validate_receipt)
+
     def __init__(self, mode=None, transport=None, provider=None):
         self.mode = mode or os.environ.get("LOS_EXTRACTION_MODE", "fixture")
         if self.mode not in {"fixture", "live"}:
@@ -64,7 +71,7 @@ class ReceiptReader:
     async def __call__(self, image):
         if self.mode == "fixture":
             await asyncio.sleep(.4)
-            return validate_receipt(json.loads((ROOT / "fixtures/receipt_expected.json").read_text()))
+            return self.fixture()
         if self.provider == "gemini":
             return await self.gemini(image)
         key = os.environ.get("OPENAI_API_KEY", "").strip()
@@ -72,13 +79,13 @@ class ReceiptReader:
             raise ProviderError("Live extraction requires OPENAI_API_KEY on the hub laptop.")
         payload = {
             "model": os.environ.get("LOS_OPENAI_MODEL", "gpt-4.1-mini"), "store": False,
-            "instructions": INSTRUCTIONS,
+            "instructions": self.instructions,
             "input": [{"role": "user", "content": [
-                {"type": "input_text", "text": "Read this receipt."},
+                {"type": "input_text", "text": self.request_text},
                 {"type": "input_image", "detail": "high", "image_url": "data:image/jpeg;base64," + base64.b64encode(image).decode()},
             ]}],
-            "text": {"format": {"type": "json_schema", "name": "receipt", "strict": True, "schema": SCHEMA}},
-            "max_output_tokens": 1000,
+            "text": {"format": {"type": "json_schema", "name": self.schema_name, "strict": True, "schema": self.schema}},
+            "max_output_tokens": self.max_output_tokens,
         }
         async with httpx.AsyncClient(timeout=20, transport=self.transport) as client:
             response = await client.post("https://api.openai.com/v1/responses", json=payload,
@@ -92,11 +99,14 @@ class ReceiptReader:
                 raise ProviderError(f"OpenAI HTTP {response.status_code}: {reason}.")
             result = response.json()
         if result.get("status") != "completed":
-            raise ValueError("Receipt provider did not complete. Recapture.")
+            raise ValueError("Image reading did not complete. Recapture.")
         text = "".join(part.get("text", "") for item in result.get("output", [])
                        if item.get("type") == "message" for part in item.get("content", [])
                        if part.get("type") == "output_text")
-        return validate_receipt(json.loads(text))
+        return self.validate(json.loads(text))
+
+    def fixture(self):
+        return validate_receipt(json.loads((ROOT / "fixtures/receipt_expected.json").read_text()))
 
     async def gemini(self, image):
         key = os.environ.get("GEMINI_API_KEY", "").strip()
@@ -106,13 +116,13 @@ class ReceiptReader:
         if not re.fullmatch(r"gemini-[a-zA-Z0-9.-]+", model):
             raise ProviderError("Invalid Gemini model name.")
         payload = {
-            "systemInstruction": {"parts": [{"text": INSTRUCTIONS}]},
+            "systemInstruction": {"parts": [{"text": self.instructions}]},
             "contents": [{"role": "user", "parts": [
-                {"text": "Read this receipt."},
+                {"text": self.request_text},
                 {"inlineData": {"mimeType": "image/jpeg", "data": base64.b64encode(image).decode()}},
             ]}],
-            "generationConfig": {"responseMimeType": "application/json", "responseJsonSchema": SCHEMA,
-                                 "maxOutputTokens": 4096},
+            "generationConfig": {"responseMimeType": "application/json", "responseJsonSchema": self.schema,
+                                 "maxOutputTokens": max(4096, self.max_output_tokens)},
         }
         async with httpx.AsyncClient(timeout=20, transport=self.transport) as client:
             response = await client.post(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
@@ -126,6 +136,6 @@ class ReceiptReader:
             raise ProviderError(f"Gemini HTTP {response.status_code}: {reason}.")
         candidates = response.json().get("candidates", [])
         if not candidates or candidates[0].get("finishReason") != "STOP":
-            raise ProviderError("Gemini did not finish reading the receipt. Recapture.")
+            raise ProviderError("Gemini did not finish reading the image. Recapture a shorter text block.")
         text = "".join(part.get("text", "") for part in candidates[0].get("content", {}).get("parts", []) if not part.get("thought"))
-        return validate_receipt(json.loads(text))
+        return self.validate(json.loads(text))

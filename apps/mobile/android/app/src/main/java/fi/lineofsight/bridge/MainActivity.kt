@@ -87,8 +87,8 @@ class MainActivity : ComponentActivity() {
             this.text = text; isAllCaps = false; setOnClickListener { run() }; content.addView(this)
         }
         label("Setup and diagnostics", 19f)
-        source = label("LineOfSight 0.2.1 / phone simulation", 13f)
-        label("Face a screen to choose Expenses or JSON. No destination menu.")
+        source = label("LineOfSight 0.3.0 / phone simulation", 13f)
+        label("Face a screen to choose Text, Expenses or JSON. No destination menu.")
         address = EditText(this).apply {
             hint = "http://YOUR-HUB-IP:8000"
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
@@ -147,7 +147,7 @@ class MainActivity : ComponentActivity() {
         }
         preview = FramePreview(this).also { content.addView(it, LinearLayout.LayoutParams(-1, dp(150))) }
         label("Central outline = marker selection area. Check upright text before testing.", 13f)
-        receiptPreview = label("No receipt held. Aim at a receipt, then hold below.", 18f).apply {
+        receiptPreview = label("No text held. Aim at text or a receipt, then hold below.", 18f).apply {
             minLines = 3
             maxLines = 4
             ellipsize = android.text.TextUtils.TruncateAt.END
@@ -161,9 +161,9 @@ class MainActivity : ComponentActivity() {
             ellipsize = android.text.TextUtils.TruncateAt.END
         }
         feedback = label("")
-        primary = button("Receipt workflow unavailable") { }
+        primary = button("Capture workflow unavailable") { }
         button("Stop camera test") { stop() }
-        button("Cancel receipt") { runtime.gesture.abort(); (hub.snapshots.value?.captureId ?: hub.lastCaptureId)?.let { hub.cancelCapture(it) } }
+        button("Cancel capture") { runtime.gesture.abort(); (hub.snapshots.value?.captureId ?: hub.lastCaptureId)?.let { hub.cancelCapture(it) } }
         button("Undo last transfer") { hub.sendAction("UNDO") }
         button("Send again (tap confirmation)") { if (!runtime.rawInputs) hub.sendAction("SEND_AGAIN") }
         label("SDK display preview / simulated selection", 19f)
@@ -185,7 +185,7 @@ class MainActivity : ComponentActivity() {
             if (physical.isChecked && sdk.initialize()) Wearables.openDATGlassesAppUpdate(this)
                 .onFailure { error, _ -> errorMessage = error.description; render() }
         }
-        label("One controller only. Phone simulation stays foreground. Physical glasses use a foreground service with notification Stop. Live mode sends the captured receipt to the provider shown above.", 13f)
+        label("One controller only. Phone simulation stays foreground. Physical glasses use a foreground service with notification Stop. Live mode sends the captured image to the provider shown above.", 13f)
         listOf(source, preview, receiptPreview, recognition, touchPad, interactionFeedback).forEach { view ->
             content.removeView(view)
             interaction.addView(view)
@@ -255,30 +255,32 @@ class MainActivity : ComponentActivity() {
         if (!::primary.isInitialized) return
         val snapshot = hub.snapshots.value
         val active = hub.guard.active != null
-        source.text = "LineOfSight 0.2.1 / ${if (physical.isChecked) "glasses" else "phone simulation"} / ${snapshot?.receiptMode ?: "disconnected"}"
+        source.text = "LineOfSight 0.3.0 / ${if (physical.isChecked) "glasses" else "phone simulation"} / ${snapshot?.receiptMode ?: "disconnected"}"
         connection.text = "${hub.status}\nHub run: ${snapshot?.runId ?: "None"}"
         start.isEnabled = hub.status == "Connected" && !active && startJob?.isActive != true
         rotate.isEnabled = !active && startJob?.isActive != true
         physical.isEnabled = !active && startJob?.isActive != true
         rawBand.isEnabled = !active && startJob?.isActive != true
         threshold.isEnabled = !active && startJob?.isActive != true
-        val name: (String?) -> String = { if (it == "expenses") "Expenses" else if (it == "json") "JSON" else "None" }
+        val name: (String?) -> String = { if (it == "expenses") "Expenses" else if (it == "json") "JSON" else if (it == "text") "Text" else "None" }
         recognition.text = "Destination: ${name(snapshot?.target)}"
         receiptPreview.text = when {
-            hub.busy && snapshot?.state in setOf("READY", "APPLIED") -> "Capturing receipt...\nKeep holding."
-            snapshot?.state == "READING" -> "Reading receipt...\nKeep holding until the amount appears."
+            hub.busy && snapshot?.state in setOf("READY", "APPLIED") -> "Capturing text...\nKeep holding."
+            snapshot?.state == "READING" -> "Reading text...\nKeep holding until the preview appears."
+            snapshot?.state in setOf("HOLDING", "PREVIEW", "APPLIED") && !snapshot?.text.isNullOrBlank() && (snapshot?.target == "text" || snapshot?.amount.isNullOrBlank()) ->
+                "${if (snapshot?.state == "APPLIED") "Sent" else "Text held"}: ${snapshot?.text}"
             snapshot?.state in setOf("HOLDING", "PREVIEW", "APPLIED") && !snapshot?.amount.isNullOrBlank() ->
                 "${if (snapshot?.state == "APPLIED") "Sent" else "Receipt held"}: ${snapshot?.amount}\n${snapshot?.merchant.orEmpty()}\n${snapshot?.receiptDate.orEmpty()}"
-            else -> "No receipt held.\nAim at the receipt, then hold below."
+            else -> "No text held.\nAim at text or a receipt, then hold below."
         }
         touchPad.text = when {
             !active -> "Start the camera below to enable hold / drag"
             runtime.gesture.held && !runtime.gesture.hasCapture -> "CAPTURE NOT STARTED\nRelease, keep the camera steady, then hold again."
-            runtime.gesture.held && hub.busy && snapshot?.state in setOf("READY", "APPLIED") -> "KEEP HOLDING\nCapturing receipt..."
-            runtime.gesture.held && snapshot?.state == "APPLIED" -> "Sent. Lift your finger before the next receipt."
+            runtime.gesture.held && hub.busy && snapshot?.state in setOf("READY", "APPLIED") -> "KEEP HOLDING\nCapturing text..."
+            runtime.gesture.held && snapshot?.state == "APPLIED" -> "Sent. Lift your finger before the next capture."
             runtime.gesture.held && snapshot?.state == "PREVIEW" -> "SLIDE RIGHT TO SEND\nKeep touching; release cancels."
             runtime.gesture.held && snapshot?.state == "HOLDING" -> "KEEP HOLDING / AIM AT A SCREEN\nRelease cancels."
-            runtime.gesture.held -> "KEEP HOLDING\nReceipt status appears above."
+            runtime.gesture.held -> "KEEP HOLDING\nText preview appears above."
             else -> "HOLD HERE TO CAPTURE\nSlide right to send; release cancels."
         }
         interactionFeedback.text = when {
@@ -289,15 +291,15 @@ class MainActivity : ComponentActivity() {
             else -> snapshot?.feedback ?: "Waiting for the hub."
         }
         feedback.text = listOf(errorMessage, hub.message, snapshot?.visionMessage, snapshot?.feedback,
-            "Receipt source: ${snapshot?.receiptMode ?: "unknown"} (independent of camera source)")
+            "Extraction source: ${snapshot?.receiptMode ?: "unknown"} (independent of camera source)")
             .filterNotNull().filter { it.isNotBlank() }.joinToString("\n")
         val intent = ActionPolicy.current(snapshot, hub.captureAvailable)
         val fresh = frame?.let { SystemClock.elapsedRealtime() - it.deliveredAtMs in 0..300 } == true
         val actionable = active && fresh && !hub.busy && hub.status == "Connected"
         primary.text = when (intent?.action) {
-            "CAPTURE" -> "Capture receipt (phone input)"
+            "CAPTURE" -> "Capture text / receipt (phone input)"
             "CONFIRM" -> "Confirm ${name(snapshot?.target)} ${snapshot?.amount.orEmpty()}"
-            else -> if (!hub.captureAvailable) "Receipt workflow unavailable on this hub" else "Waiting for receipt / target"
+            else -> if (!hub.captureAvailable) "Capture workflow unavailable on this hub" else "Waiting for text / target"
         }
         primary.isEnabled = actionable && intent != null && !runtime.rawInputs && !runtime.gesture.held
         primary.setOnClickListener { if (intent != null) activate(intent) }

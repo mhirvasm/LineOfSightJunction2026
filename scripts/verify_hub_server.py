@@ -29,7 +29,7 @@ async def exercise(port):
             connect(address + "?role=mobile") as mobile, \
             connect(address + "?role=operator") as operator:
         ready = lambda value: value["type"] == "SNAPSHOT" and value["connections"] == {
-            "mobile": True, "targets": {"expenses": True, "json": True}, "operators": 1}
+            "mobile": True, "targets": {"expenses": True, "json": True, "text": False}, "operators": 1}
         sockets = [expenses, json_target, mobile, operator]
         values = await asyncio.gather(*(receive_until(client, ready) for client in sockets))
         assert len({value["run_id"] for value in values}) == 1
@@ -40,7 +40,7 @@ async def exercise(port):
         await operator.send(json.dumps({"v": 1, "type": "RESET", "run_id": initial}))
         reset = await asyncio.gather(*(receive_until(client, lambda value: value["type"] == "SNAPSHOT" and value["run_id"] != initial) for client in sockets))
         assert len({value["run_id"] for value in reset}) == 1
-        assert all(value["drafts"] == {"expenses": None, "json": None} for value in reset)
+        assert all(value["drafts"] == {"expenses": None, "json": None, "text": None} for value in reset)
         new_run = reset[0]["run_id"]
         await operator.send(json.dumps({"v": 1, "type": "RESET", "run_id": initial}))
         error = await receive_until(operator, lambda value: value["type"] == "ERROR")
@@ -92,7 +92,7 @@ def main():
             async def check_empty():
                 async with connect(f"ws://127.0.0.1:{port}/v1/events?role=operator") as operator:
                     current = json.loads(await asyncio.wait_for(operator.recv(), timeout=5))
-                    assert current["drafts"] == {"expenses": None, "json": None}
+                    assert current["drafts"] == {"expenses": None, "json": None, "text": None}
                     assert current["connections"]["mobile"] is False
             asyncio.run(check_empty())
         finally:
