@@ -80,7 +80,7 @@ Vision runs in bounded background work. Results carry stream_id and frame_seq; s
 
 ### POST /v1/captures
 
-Multipart fields: `run_id`, `capture_id`, `age_ms`, and `image` (JPEG bytes). The phone freezes/copies the exact frame at the Capture callback, before any async upload. Capture is allowed only in READY. Limit concurrent extraction to one. Apply the same bounded size/decode checks as frames.
+Multipart fields: `run_id`, `capture_id`, `age_ms`, and `image` (JPEG bytes). The phone freezes/copies the exact frame at the Capture callback, before any async upload. Capture is allowed in READY or APPLIED. A fresh grab preserves both drafts and the Undo slot until another successful apply. Limit concurrent extraction to one. Apply the same bounded size/decode checks as frames.
 
 Store the capture_id as accepted BEFORE starting extraction. A duplicate upload returns accepted/current status without another model call; a different capture_id while READING returns busy. Reject a reused capture_id with different image bytes. Return a clear response such as `{ "accepted": true, "capture_id": "..." }`; completion arrives in SNAPSHOT.
 
@@ -146,7 +146,7 @@ Accept DISPLAYED only from that target's current socket and only for the matchin
 | READING | CANCEL/STOP; ignore new captures and confirms. |
 | HOLDING | Select a connected target using fresh vision; CANCEL/STOP. |
 | PREVIEW | CONFIRM for exact preview_id, CANCEL/STOP. Loss/change of target invalidates preview. |
-| APPLIED | SEND_AGAIN, UNDO, CANCEL/STOP. A repeated old CONFIRM is a no-op. |
+| APPLIED | New capture, SEND_AGAIN, UNDO, CANCEL/STOP. A repeated old CONFIRM is a no-op. |
 
 Extraction success enters HOLDING only if run_id/capture_id are still active. Failure or invalid required fields returns READY with a recapture message. CANCEL invalidates the receipt/preview and returns READY during an active camera session; STOP enters STOPPED. Neither reverses an applied draft. A new START clears the active receipt/preview but does not erase either destination's previous draft.
 
@@ -163,7 +163,7 @@ The hub is the only writer. CONFIRM first checks the current run. If its preview
 
 Broadcast afterward. Feedback starts as `Sent; waiting for screen`. After a matching DISPLAYED, say `Shown on Expenses/JSON`. After a short timeout or target disconnect, say `Draft updated; screen not confirmed`. Do not retry the mutation. Reconnecting targets receive the current snapshot and may acknowledge it.
 
-UNDO restores the previous-draft slot once, clears that slot, invalidates the current preview/last-commit feedback, and returns to HOLDING if a receipt remains (otherwise READY/STOPPED as appropriate). There is no manual form editing and no conflict resolution. SEND_AGAIN creates a new preview_id even for the same target. It must never reuse the prior commit_id.
+UNDO is available in READY/APPLIED. It restores the previous-draft slot once, clears that slot, invalidates the current capture/preview/last-commit feedback, and returns to READY. There is no manual form editing and no conflict resolution. SEND_AGAIN creates a new preview_id even for the same target. It must never reuse the prior commit_id.
 
 Duplicate checks, draft mutation, and state transition run in one event-loop turn or under one hub lock. Do not await image/model work while holding that lock. Run one server worker. Keep slow work outside the event loop; completion returns tagged data to the workflow.
 
@@ -174,3 +174,24 @@ Wrong frame at capture; duplicate confirmation; stale target preview; repeated u
 ## Privacy/demo constraints
 
 Use synthetic receipts and a consenting wearer. Do not log camera images or provider keys. Release active image buffers after extraction/cancel/stop. Cloud extraction sends the selected image to the configured provider; make that boundary clear. Final receipt data remains in demo memory until Reset/restart. No public deployment claim is made.
+
+
+## Hold/drag build clarification (issues #8-#12)
+
+CANCEL carries capture_id. It records a cancellation even if that capture upload
+has not arrived yet. A cancel for an old capture cannot cancel a newer one. A
+release after APPLIED never undoes a draft. Clients include capture_id with
+CONFIRM to let a failed freshness check cancel only that same interaction.
+Capture cancellation records and image digests remain bounded for the run; images
+do not. Only accepted capture IDs invoke extraction, at most once.
+
+The band mapping is DOWN -> freeze, fresh rightward MOVE after HOLDING/PREVIEW ->
+confirm exact preview (or CANCEL if no destination), UP before commit -> CANCEL.
+Rebase displacement on readiness or preview/target change. Pre-ready movement is
+never queued. Ignore movement after send/cancel until release. No target while
+looking between screens is allowed; an attempted paste without a target cancels.
+
+Snapshots add extraction_provider (gemini/openai). source_mode remains fixture/live.
+LOS_EXTRACTION_MODE explicitly selects the mode; LOS_EXTRACTION_PROVIDER selects
+one provider. There is no provider or fixture fallback. scripts/run_hub.py loads
+only recognized keys from ignored .env without printing them.

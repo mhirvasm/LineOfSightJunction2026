@@ -10,6 +10,8 @@ import android.graphics.RectF
 import android.os.Bundle
 import android.os.SystemClock
 import android.view.View
+import android.view.MotionEvent
+import android.content.Intent
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
@@ -19,16 +21,17 @@ import android.widget.ScrollView
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.lifecycle.lifecycleScope
 import com.meta.wearable.dat.core.Wearables
 import com.meta.wearable.dat.core.types.Permission
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+    private lateinit var runtime: BridgeRuntime
+    private lateinit var rawBand: CheckBox
+    private lateinit var threshold: EditText
+    private lateinit var touchPad: TextView
     private lateinit var hub: HubClient
     private lateinit var sdk: MetaBridge
     private lateinit var address: EditText
@@ -43,14 +46,10 @@ class MainActivity : ComponentActivity() {
     private lateinit var rotate: Button
     private lateinit var preview: FramePreview
     private lateinit var displayPreview: FrameLayout
-    private var frame: JpegFrame? = null
+    private val frame: JpegFrame? get() = runtime.frame
     private var rotation = 0
     private var startJob: Job? = null
-    private var ticks: Job? = null
     private var errorMessage = ""
-    private var sdkMessage = "SDK not started."
-    private var diagnostic = false
-    private var selections = 0
     private var actionTime = -1000L
     private val permissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
         if (result.values.all { it }) connect() else {
@@ -65,8 +64,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        hub = HubClient(lifecycleScope, SystemClock::elapsedRealtime)
-        sdk = MetaBridge(this, lifecycleScope)
+        runtime = BridgeRuntime.get(this)
+        hub = runtime.hub
+        sdk = runtime.sdk
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(30), dp(20), dp(24))
@@ -92,12 +92,24 @@ class MainActivity : ComponentActivity() {
         }
         physical = CheckBox(this).apply {
             text = "Use physical Display glasses (hardware check pending)"
+            isChecked = runtime.physical
             content.addView(this)
             setOnCheckedChangeListener { _, _ ->
                 stop()
                 if (sdk.initialize()) sdk.stop()
                 render()
             }
+        }
+        rawBand = CheckBox(this).apply {
+            text = "Raw band hold/drag (requires Inputs approval); off = tap fallback"
+            isChecked = runtime.rawInputs
+            content.addView(this)
+        }
+        threshold = EditText(this).apply {
+            hint = "Band right-drag threshold in SDK units"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+            setText("80")
+            content.addView(this)
         }
         button("Connect to hub") { requestPermissionsAndConnect() }
         connection = label("Disconnected")
@@ -108,21 +120,35 @@ class MainActivity : ComponentActivity() {
                 rotate.text = "Camera rotation: $rotation° (tap +90°)"
             }
         }
+        touchPad = label("PHONE SIMULATION: hold here, move right to send, release to cancel", 18f).apply {
+            setBackgroundColor(Color.rgb(200, 235, 224))
+            minHeight = dp(110)
+            setOnTouchListener { view, event ->
+                if (runtime.physical || hub.guard.active == null) return@setOnTouchListener false
+                view.parent.requestDisallowInterceptTouchEvent(true)
+                runtime.gesture.threshold = dp(80).toFloat()
+                runtime.gesture.update(hub.snapshots.value)
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> runtime.gesture.down(event.x, event.y)
+                    MotionEvent.ACTION_MOVE -> runtime.gesture.move(event.x, event.y)
+                    MotionEvent.ACTION_UP -> { runtime.gesture.up(); view.performClick() }
+                    MotionEvent.ACTION_CANCEL -> runtime.gesture.abort()
+                }
+                true
+            }
+        }
         preview = FramePreview(this).also { content.addView(it, LinearLayout.LayoutParams(-1, dp(250))) }
         label("Central outline = marker selection area. Check upright text before testing.", 13f)
         recognition = label("Recognized: None / Stable target: None", 19f)
         feedback = label("")
         primary = button("Receipt workflow unavailable") { }
         button("Stop camera test") { stop() }
-        button("Cancel receipt") { hub.sendAction("CANCEL") }
+        button("Cancel receipt") { runtime.gesture.abort(); (hub.snapshots.value?.captureId ?: hub.lastCaptureId)?.let { hub.cancelCapture(it) } }
+        button("Undo last transfer") { hub.sendAction("UNDO") }
+        button("Send again (tap confirmation)") { if (!runtime.rawInputs) hub.sendAction("SEND_AGAIN") }
         label("SDK display preview / simulated selection", 19f)
-        sdkState = label(sdkMessage)
+        sdkState = label(runtime.sdkMessage)
         displayPreview = FrameLayout(this).also { content.addView(it, LinearLayout.LayoutParams(-1, dp(300))) }
-        button("Show SDK selection test (no transfer)") {
-            diagnostic = !diagnostic
-            render()
-        }
-        label("Tap the action inside the SDK preview to test its callback. This is not a real band event.", 13f)
         button("Register physical glasses with Meta AI") {
             stop()
             if (physical.isChecked) sdk.register(this)
@@ -139,34 +165,7 @@ class MainActivity : ComponentActivity() {
             if (physical.isChecked && sdk.initialize()) Wearables.openDATGlassesAppUpdate(this)
                 .onFailure { error, _ -> errorMessage = error.description; render() }
         }
-        label("Only one phone/controller may connect. Close /fixture-mobile first.\nReceipt extraction, transfers and Undo require the later hub workflow.\nThis app stops camera work when backgrounded; press Connect and Start after returning.", 13f)
-
-        hub.onChanged = { render() }
-        hub.onInvalidated = {
-            frame = null
-            preview.replace(null)
-            diagnostic = false
-            sdk.stop()
-        }
-        sdk.onFrame = { jpeg, bitmap ->
-            val lease = hub.guard.active
-            if (lease != null && hub.guard.usable(lease, jpeg, SystemClock.elapsedRealtime())) {
-                frame = jpeg
-                preview.replace(bitmap)
-                hub.submit(lease, jpeg)
-                render()
-            } else bitmap.recycle()
-        }
-        sdk.onPreview = {
-            displayPreview.removeAllViews()
-            if (it != null) displayPreview.addView(it, FrameLayout.LayoutParams(-1, -1))
-        }
-        sdk.onFailure = { reason ->
-            errorMessage = reason
-            hub.stop()
-            render()
-        }
-        sdk.onStatus = { sdkMessage = it; render() }
+        label("One controller only. Phone simulation stays foreground. Physical glasses use a foreground service with notification Stop. Live mode sends the captured receipt to the provider shown above.", 13f)
         render()
     }
 
@@ -194,10 +193,14 @@ class MainActivity : ComponentActivity() {
         if (startJob?.isActive == true || hub.guard.active != null) return
         errorMessage = ""
         val usePhone = !physical.isChecked
-        startJob = lifecycleScope.launch {
+        startJob = runtime.scope.launch {
             try {
                 val lease = hub.startStream(if (usePhone) "camera_stream" else "native_camera")
-                sdk.start(usePhone, rotation)
+                runtime.physical = !usePhone
+                runtime.rawInputs = !usePhone && rawBand.isChecked
+                runtime.gesture.threshold = if (usePhone) dp(80).toFloat() else (threshold.text.toString().toFloatOrNull()?.takeIf { it > 0 && it.isFinite() } ?: 80f)
+                if (!usePhone) startForegroundService(Intent(this@MainActivity, GlassesService::class.java))
+                sdk.start(usePhone, rotation, runtime.rawInputs)
                 if (!hub.guard.owns(lease)) sdk.stop()
             } catch (error: CancellationException) {
                 throw error
@@ -213,10 +216,6 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun activate(intent: ActionIntent) {
-        if (intent.action == "SDK_TEST") {
-            if (diagnostic && hub.guard.active != null) { selections++; render() }
-            return
-        }
         val now = SystemClock.elapsedRealtime()
         if (now - actionTime < 600) return
         if (hub.perform(intent, frame)) actionTime = now
@@ -225,7 +224,7 @@ class MainActivity : ComponentActivity() {
     private fun stop() {
         startJob?.cancel()
         startJob = null
-        hub.stop()
+        runtime.stop()
     }
 
     private fun render() {
@@ -237,6 +236,8 @@ class MainActivity : ComponentActivity() {
         start.isEnabled = hub.status == "Connected" && !active && startJob?.isActive != true
         rotate.isEnabled = !active && startJob?.isActive != true
         physical.isEnabled = !active && startJob?.isActive != true
+        rawBand.isEnabled = !active && startJob?.isActive != true
+        threshold.isEnabled = !active && startJob?.isActive != true
         val name: (String?) -> String = { if (it == "expenses") "Expenses" else if (it == "json") "JSON" else "None" }
         recognition.text = "Recognized: ${name(snapshot?.recognized)}\nStable target: ${name(snapshot?.target)}"
         feedback.text = listOf(errorMessage, hub.message, snapshot?.visionMessage, snapshot?.feedback,
@@ -250,25 +251,33 @@ class MainActivity : ComponentActivity() {
             "CONFIRM" -> "Confirm ${name(snapshot?.target)} ${snapshot?.amount.orEmpty()}"
             else -> if (!hub.captureAvailable) "Receipt workflow unavailable on this hub" else "Waiting for receipt / target"
         }
-        primary.isEnabled = actionable && intent != null
+        primary.isEnabled = actionable && intent != null && !runtime.rawInputs && !runtime.gesture.held
         primary.setOnClickListener { if (intent != null) activate(intent) }
-        sdkState.text = "$sdkMessage\nSDK selections received: $selections"
-        val displayAction = if (diagnostic && active) ActionIntent(snapshot?.runId.orEmpty(), "SDK_TEST") else intent.takeIf { actionable }
-        val title = if (diagnostic) "SDK selection test" else "${name(snapshot?.target)} ${snapshot?.amount.orEmpty()}"
-        val detail = if (diagnostic) "Selections: $selections / no transfer" else snapshot?.visionMessage ?: "Waiting for hub"
-        sdk.showCard(title, detail, displayAction, ::activate)
+        sdkState.text = "${runtime.sdkMessage}\n${runtime.inputMessage}"
     }
 
     override fun onStart() {
         super.onStart()
-        ticks = lifecycleScope.launch { while (isActive) { render(); delay(150) } }
+        runtime.changed = { render() }
+        runtime.bitmap = { preview.replace(it) }
+        runtime.preview = {
+            displayPreview.removeAllViews()
+            if (it != null) displayPreview.addView(it, FrameLayout.LayoutParams(-1, -1))
+        }
+        render()
     }
 
     override fun onStop() {
-        ticks?.cancel()
-        startJob?.cancel()
-        startJob = null
-        if (::hub.isInitialized) hub.pause()
+        runtime.changed = {}
+        runtime.bitmap = null
+        runtime.preview = null
+        preview.replace(null)
+        if (!runtime.physical) {
+            startJob?.cancel()
+            startJob = null
+            runtime.gesture.abort()
+            hub.pause()
+        }
         super.onStop()
     }
 

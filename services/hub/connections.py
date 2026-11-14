@@ -1,4 +1,4 @@
-"""One in-memory run and socket ownership; receipt workflow comes later."""
+"""One in-memory run, socket ownership, and serialized receipt actions."""
 
 import asyncio
 from copy import deepcopy
@@ -33,8 +33,12 @@ class Hub:
         self.clients = {}
         self.broadcast_lock = asyncio.Lock()
         self.reset()
+        from .workflow import ReceiptWorkflow
+        self.workflow = ReceiptWorkflow(self)
 
     def reset(self):
+        if getattr(self, "workflow", None):
+            self.workflow.invalidate()
         if getattr(self, "vision", None):
             self.vision.invalidate()
         self.run_id = str(uuid4())
@@ -50,15 +54,16 @@ class Hub:
         self.applied_commit_ids = set()
         self.previous_draft = None
         self.last_commit = None
-        self.feedback = "Connection test ready. Camera capture and transfers are not connected yet."
+        self.feedback = "Ready. Start the camera and hold to capture a receipt."
 
     def snapshot(self):
         return deepcopy({
             "v": 1, "type": "SNAPSHOT", "run_id": self.run_id,
-            "state": self.state, "source_mode": "fixture",
+            "state": self.state, "source_mode": self.workflow.reader.mode,
+            "extraction_provider": self.workflow.reader.provider,
             "capture_id": self.capture_id, "receipt": self.receipt,
             "target_id": self.target_id, "preview_id": self.preview_id,
-            "can_confirm": False, "drafts": self.drafts,
+            "can_confirm": self.state == "PREVIEW" and self.preview_id is not None and self.workflow.fresh_target() == self.target_id, "drafts": self.drafts,
             "last_commit": self.last_commit, "feedback": self.feedback, "error": None,
             "vision": self.vision.snapshot() if getattr(self, "vision", None) else None,
             "connections": {
@@ -83,6 +88,7 @@ class Hub:
         return client, None
 
     def stop_interaction(self):
+        self.workflow.invalidate()
         if getattr(self, "vision", None):
             self.vision.invalidate()
         self.state = "STOPPED"
@@ -92,7 +98,7 @@ class Hub:
         self.target_id = None
         self.active_stream_id = None
         self.frame_source = None
-        self.feedback = "Controller paused or disconnected. A new Start will be required when workflow is implemented."
+        self.feedback = "Paused. Press Start to resume; applied drafts remain."
 
     def unbind(self, client):
         if self.clients.get(client.key) is not client:
@@ -143,7 +149,7 @@ class Hub:
                 return False, None
             self.stop_interaction()
             self.state = "READY"
-            self.feedback = "Phone camera test ready. Receipt capture and transfers are not implemented yet."
+            self.feedback = "Ready. Hold to capture a receipt."
             return True, None
         if kind in {"STREAM_STARTED", "DEVICE_PAUSED"}:
             if client.role != "mobile":
@@ -168,8 +174,12 @@ class Hub:
                 self.preview_id = None
             self.active_stream_id = stream_id
             self.frame_source = source
+            if changed:
+                self.workflow.clear("Camera changed. Hold to capture again.")
             return changed, None
-        return False, ("not_implemented", "This event belongs to a later workflow task; no draft was changed.")
+        if kind in {"ACTION", "DISPLAYED"}:
+            return self.workflow.event(client, event)
+        return False, ("invalid_event", "Unknown event.")
 
     async def error(self, client, code, message):
         await client.send({"v": 1, "type": "ERROR", "run_id": self.run_id, "error": code, "message": message})

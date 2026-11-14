@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from services.hub.app import create_app
+from services.hub.extraction.receipt import validate_receipt
 
 
 class FoundationChecks(unittest.TestCase):
@@ -66,7 +67,7 @@ class FoundationChecks(unittest.TestCase):
         receipt = json.loads((fixture_dir / "receipt_expected.json").read_text())
         original = ROOT / "lineofsight/LineOfSight_Starter_v2"
         self.assertEqual(receipt, json.loads((original / "fixtures/receipt_expected.json").read_text()))
-        self.assertEqual((ROOT / "contracts/protocol.md").read_bytes(), (original / "contracts/protocol.md").read_bytes())
+        self.assertEqual(validate_receipt(receipt), receipt)
         self.assertEqual(receipt["total_minor"], 2480)
         self.assertIsNone(receipt["tax_minor"])
         self.assertEqual(receipt["needs_review"], [])

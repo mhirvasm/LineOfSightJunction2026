@@ -15,6 +15,12 @@ import com.meta.wearable.dat.camera.addCamera
 import com.meta.wearable.dat.camera.types.StreamConfiguration
 import com.meta.wearable.dat.camera.types.StreamState
 import com.meta.wearable.dat.camera.types.VideoQuality
+import com.meta.wearable.dat.inputs.addInputs
+import com.meta.wearable.dat.inputs.removeInputs
+import com.meta.wearable.dat.inputs.types.InputEvent
+import com.meta.wearable.dat.inputs.types.InputSource
+import com.meta.wearable.dat.inputs.types.InputsConfiguration
+import com.meta.wearable.dat.inputs.types.InputsState
 import com.meta.wearable.dat.core.Wearables
 import com.meta.wearable.dat.core.selectors.AutoDeviceSelector
 import com.meta.wearable.dat.core.selectors.SpecificDeviceSelector
@@ -48,6 +54,8 @@ import java.io.ByteArrayOutputStream
 
 class MetaBridge(private val context: Context, private val parent: CoroutineScope) {
     private companion object { var sdkInitialized = false }
+    var onDrag: (InputEvent.Drag) -> Unit = {}
+    private var inputsAttached = false
     var onFrame: (JpegFrame, Bitmap) -> Unit = { _, _ -> }
     var onPreview: (View?) -> Unit = {}
     var onFailure: (String) -> Unit = {}
@@ -76,7 +84,7 @@ class MetaBridge(private val context: Context, private val parent: CoroutineScop
         Wearables.startRegistration(activity)
     }
 
-    suspend fun start(phone: Boolean, rotation: Int) {
+    suspend fun start(phone: Boolean, rotation: Int, rawInputs: Boolean = false) {
         stop()
         check(initialize()) { "Meta SDK could not initialize." }
         val epoch = generation
@@ -113,6 +121,26 @@ class MetaBridge(private val context: Context, private val parent: CoroutineScop
         created.start()
         withTimeout(12_000) { created.state.first { it == DeviceSessionState.STARTED } }
         check(epoch == generation) { "Camera start was canceled." }
+        if (rawInputs) {
+            val inputs = created.addInputs(InputsConfiguration(sources = setOf(InputSource.NEURAL_BAND_DRAG)))
+                .fold(onSuccess = { it }, onFailure = { error, _ -> error("Inputs approval/configuration: ${error.description}") })
+            inputsAttached = true
+            owner.launch { inputs.events.collect { event ->
+                if (epoch == generation && event is InputEvent.Drag && event.source == InputSource.NEURAL_BAND_DRAG) onDrag(event)
+            } }
+            owner.launch { inputs.errors.collect { failure ->
+                if (failure != null) onFailure("Inputs: ${failure.description}")
+            } }
+            owner.launch {
+                var active = false
+                inputs.state.collect { state ->
+                    if (state == InputsState.ACTIVE) active = true
+                    if (active && state != InputsState.ACTIVE) onFailure("Band input interrupted. Start again.")
+                }
+            }
+            withTimeout(8000) { inputs.state.first { it == InputsState.ACTIVE } }
+            onStatus("Raw band inputs active; verify hold and right-drag direction on hardware.")
+        }
         val attached = created.addCamera(StreamConfiguration(videoQuality = VideoQuality.MEDIUM, frameRate = 15, compressVideo = false))
             .fold(onSuccess = { it }, onFailure = { error, _ -> error(error.description) })
         camera = attached
@@ -210,6 +238,8 @@ class MetaBridge(private val context: Context, private val parent: CoroutineScop
         camera = null
         display?.close()
         display = null
+        if (inputsAttached) session?.removeInputs()
+        inputsAttached = false
         session?.stop()
         session = null
         renderKey = null

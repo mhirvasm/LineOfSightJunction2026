@@ -84,7 +84,7 @@ class HubChecks(unittest.TestCase):
                 bad = [({"v": 1, "type": "RESET", "run_id": "old-run"}, "stale_run"),
                        ({"v": True, "type": "RESET", "run_id": initial["run_id"]}, "invalid_event"),
                        ({"v": 1, "type": [], "run_id": initial["run_id"]}, "invalid_event"),
-                       ({"v": 1, "type": "ACTION", "action": "CONFIRM", "run_id": initial["run_id"]}, "not_implemented")]
+                       ({"v": 1, "type": "ACTION", "action": "CONFIRM", "run_id": initial["run_id"]}, "forbidden")]
                 for event, code in bad:
                     operator.send_json(event)
                     self.assertEqual(operator.receive_json()["error"], code)
