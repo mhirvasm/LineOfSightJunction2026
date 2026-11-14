@@ -6,6 +6,8 @@ from hashlib import sha256
 from time import monotonic
 from uuid import UUID, uuid4
 
+import httpx
+
 from .extraction.receipt import ProviderError, ReceiptReader, validate_receipt
 from .vision.service import FrameRejected
 
@@ -108,6 +110,8 @@ class ReceiptWorkflow:
             return
         except ProviderError as error:
             record, failure = None, str(error)
+        except (TimeoutError, httpx.TimeoutException):
+            record, failure = None, "Receipt reading timed out. Check the hub internet connection, then capture again."
         except Exception:
             record, failure = None, "Could not read receipt. Check live configuration or recapture a clearer image."
         if run != h.run_id or h.capture_id != capture or h.clients.get("mobile") is not owner or h.state != "READING":

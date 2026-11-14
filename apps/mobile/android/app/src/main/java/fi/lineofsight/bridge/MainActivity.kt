@@ -32,6 +32,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var rawBand: CheckBox
     private lateinit var threshold: EditText
     private lateinit var touchPad: TextView
+    private lateinit var receiptPreview: TextView
+    private lateinit var interactionFeedback: TextView
     private lateinit var hub: HubClient
     private lateinit var sdk: MetaBridge
     private lateinit var address: EditText
@@ -67,12 +69,16 @@ class MainActivity : ComponentActivity() {
         runtime = BridgeRuntime.get(this)
         hub = runtime.hub
         sdk = runtime.sdk
-        val content = LinearLayout(this).apply {
+        val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(30), dp(20), dp(24))
+            setPadding(dp(16), dp(32), dp(16), dp(24))
             setBackgroundColor(Color.rgb(245, 247, 250))
         }
-        setContentView(ScrollView(this).apply { addView(content) })
+        val interaction = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        root.addView(interaction, LinearLayout.LayoutParams(-1, -2))
+        root.addView(ScrollView(this).apply { addView(content) }, LinearLayout.LayoutParams(-1, 0, 1f))
+        setContentView(root)
         fun label(text: String, size: Float = 16f): TextView = TextView(this).apply {
             this.text = text; textSize = size; setTextColor(Color.rgb(20, 34, 53))
             setPadding(0, dp(8), 0, dp(8)); content.addView(this)
@@ -80,8 +86,8 @@ class MainActivity : ComponentActivity() {
         fun button(text: String, run: () -> Unit): Button = Button(this).apply {
             this.text = text; isAllCaps = false; setOnClickListener { run() }; content.addView(this)
         }
-        label("LineOfSight", 28f)
-        source = label("PHONE CAMERA VIA META MOCK / BAND SIMULATED", 14f)
+        label("Setup and diagnostics", 19f)
+        source = label("LineOfSight 0.2.1 / phone simulation", 13f)
         label("Face a screen to choose Expenses or JSON. No destination menu.")
         address = EditText(this).apply {
             hint = "http://YOUR-HUB-IP:8000"
@@ -122,7 +128,9 @@ class MainActivity : ComponentActivity() {
         }
         touchPad = label("PHONE SIMULATION: hold here, move right to send, release to cancel", 18f).apply {
             setBackgroundColor(Color.rgb(200, 235, 224))
-            minHeight = dp(110)
+            minHeight = dp(88)
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(dp(12), dp(8), dp(12), dp(8))
             setOnTouchListener { view, event ->
                 if (runtime.physical || hub.guard.active == null) return@setOnTouchListener false
                 view.parent.requestDisallowInterceptTouchEvent(true)
@@ -137,9 +145,21 @@ class MainActivity : ComponentActivity() {
                 true
             }
         }
-        preview = FramePreview(this).also { content.addView(it, LinearLayout.LayoutParams(-1, dp(250))) }
+        preview = FramePreview(this).also { content.addView(it, LinearLayout.LayoutParams(-1, dp(150))) }
         label("Central outline = marker selection area. Check upright text before testing.", 13f)
-        recognition = label("Recognized: None / Stable target: None", 19f)
+        receiptPreview = label("No receipt held. Aim at a receipt, then hold below.", 18f).apply {
+            minLines = 3
+            maxLines = 4
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            setBackgroundColor(Color.WHITE)
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+        }
+        recognition = label("Destination: None", 16f)
+        interactionFeedback = label("Connect and start the camera below.", 14f).apply {
+            minLines = 2
+            maxLines = 3
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        }
         feedback = label("")
         primary = button("Receipt workflow unavailable") { }
         button("Stop camera test") { stop() }
@@ -166,6 +186,10 @@ class MainActivity : ComponentActivity() {
                 .onFailure { error, _ -> errorMessage = error.description; render() }
         }
         label("One controller only. Phone simulation stays foreground. Physical glasses use a foreground service with notification Stop. Live mode sends the captured receipt to the provider shown above.", 13f)
+        listOf(source, preview, receiptPreview, recognition, touchPad, interactionFeedback).forEach { view ->
+            content.removeView(view)
+            interaction.addView(view)
+        }
         render()
     }
 
@@ -231,7 +255,7 @@ class MainActivity : ComponentActivity() {
         if (!::primary.isInitialized) return
         val snapshot = hub.snapshots.value
         val active = hub.guard.active != null
-        source.text = if (physical.isChecked) "PHYSICAL GLASSES PATH / HARDWARE VALIDATION PENDING" else "PHONE CAMERA VIA META MOCK / BAND SIMULATED"
+        source.text = "LineOfSight 0.2.1 / ${if (physical.isChecked) "glasses" else "phone simulation"} / ${snapshot?.receiptMode ?: "disconnected"}"
         connection.text = "${hub.status}\nHub run: ${snapshot?.runId ?: "None"}"
         start.isEnabled = hub.status == "Connected" && !active && startJob?.isActive != true
         rotate.isEnabled = !active && startJob?.isActive != true
@@ -239,7 +263,31 @@ class MainActivity : ComponentActivity() {
         rawBand.isEnabled = !active && startJob?.isActive != true
         threshold.isEnabled = !active && startJob?.isActive != true
         val name: (String?) -> String = { if (it == "expenses") "Expenses" else if (it == "json") "JSON" else "None" }
-        recognition.text = "Recognized: ${name(snapshot?.recognized)}\nStable target: ${name(snapshot?.target)}"
+        recognition.text = "Destination: ${name(snapshot?.target)}"
+        receiptPreview.text = when {
+            hub.busy && snapshot?.state in setOf("READY", "APPLIED") -> "Capturing receipt...\nKeep holding."
+            snapshot?.state == "READING" -> "Reading receipt...\nKeep holding until the amount appears."
+            snapshot?.state in setOf("HOLDING", "PREVIEW", "APPLIED") && !snapshot?.amount.isNullOrBlank() ->
+                "${if (snapshot?.state == "APPLIED") "Sent" else "Receipt held"}: ${snapshot?.amount}\n${snapshot?.merchant.orEmpty()}\n${snapshot?.receiptDate.orEmpty()}"
+            else -> "No receipt held.\nAim at the receipt, then hold below."
+        }
+        touchPad.text = when {
+            !active -> "Start the camera below to enable hold / drag"
+            runtime.gesture.held && !runtime.gesture.hasCapture -> "CAPTURE NOT STARTED\nRelease, keep the camera steady, then hold again."
+            runtime.gesture.held && hub.busy && snapshot?.state in setOf("READY", "APPLIED") -> "KEEP HOLDING\nCapturing receipt..."
+            runtime.gesture.held && snapshot?.state == "APPLIED" -> "Sent. Lift your finger before the next receipt."
+            runtime.gesture.held && snapshot?.state == "PREVIEW" -> "SLIDE RIGHT TO SEND\nKeep touching; release cancels."
+            runtime.gesture.held && snapshot?.state == "HOLDING" -> "KEEP HOLDING / AIM AT A SCREEN\nRelease cancels."
+            runtime.gesture.held -> "KEEP HOLDING\nReceipt status appears above."
+            else -> "HOLD HERE TO CAPTURE\nSlide right to send; release cancels."
+        }
+        interactionFeedback.text = when {
+            errorMessage.isNotBlank() -> errorMessage
+            hub.status != "Connected" -> hub.status
+            !active -> "Press Start camera test in setup below."
+            hub.message.contains("failed", true) || hub.message.contains("rejected", true) -> hub.message
+            else -> snapshot?.feedback ?: "Waiting for the hub."
+        }
         feedback.text = listOf(errorMessage, hub.message, snapshot?.visionMessage, snapshot?.feedback,
             "Receipt source: ${snapshot?.receiptMode ?: "unknown"} (independent of camera source)")
             .filterNotNull().filter { it.isNotBlank() }.joinToString("\n")

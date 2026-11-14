@@ -42,7 +42,7 @@ async def exercise(port, live=False):
             assert response.status_code == 202, response.text
             duplicate = await http.post('/v1/captures', data=data, files={'image':('receipt.jpg', image, 'image/jpeg')})
             assert duplicate.status_code == 202
-            await receive_until(mobile, lambda s: s['type']=='SNAPSHOT' and s['capture_id']==capture and s['state'] in ('HOLDING','PREVIEW'))
+            await receive_until(mobile, lambda s: s['type']=='SNAPSHOT' and s['capture_id']==capture and s['state'] in ('HOLDING','PREVIEW'), timeout=30)
             for _ in range(5):
                 seq += 1
                 response = await http.post('/v1/frames', data=dict(run_id=run, stream_id=stream, age_ms='0', frame_seq=str(seq)), files={'image':('frame.jpg', camera_frame(((marker,360,240),)), 'image/jpeg')})

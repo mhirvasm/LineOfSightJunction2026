@@ -14,8 +14,8 @@ from websockets.asyncio.client import connect
 ROOT = Path(__file__).resolve().parents[1]
 
 
-async def receive_until(connection, predicate):
-    async with asyncio.timeout(5):
+async def receive_until(connection, predicate, timeout=5):
+    async with asyncio.timeout(timeout):
         while True:
             message = json.loads(await connection.recv())
             if predicate(message):

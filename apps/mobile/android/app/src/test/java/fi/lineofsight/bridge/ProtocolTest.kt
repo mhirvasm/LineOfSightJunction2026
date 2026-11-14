@@ -26,6 +26,16 @@ class ProtocolTest {
         assertNull(ActionPolicy.current(parsed, false))
     }
 
+    @Test fun `held receipt details are available without a destination`() {
+        val data = JSONObject("""{"v":1,"type":"SNAPSHOT","run_id":"${UUID.randomUUID()}","state":"HOLDING","target_id":null,"capture_id":"capture","receipt":{"merchant":"Demo Cafe","date":"2026-11-14","total_minor":2480,"currency":"EUR"}}""")
+        val parsed = HubSnapshot.parse(data)
+        assertNull(parsed.target)
+        assertEquals("EUR 24.80", parsed.amount)
+        assertEquals("Demo Cafe", parsed.merchant)
+        assertEquals("2026-11-14", parsed.receiptDate)
+        assertNull(ActionPolicy.current(parsed, true))
+    }
+
     @Test fun `old confirmation cannot follow a changed target preview or reset run`() {
         val old = snapshot("PREVIEW", "expenses-preview", true)
         val action = requireNotNull(ActionPolicy.current(old, true))
