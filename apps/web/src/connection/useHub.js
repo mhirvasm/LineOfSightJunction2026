@@ -16,5 +16,7 @@ export function useHub(role, targetId) {
       current.dispose();
     };
   }, [role, targetId]);
-  return { snapshot, status, error, send: (event) => connection.current?.send(event) ?? false };
+  return { snapshot, status, error,
+    readSnapshot: () => connection.current?.getSnapshot() ?? null,
+    send: (event) => connection.current?.send(event) ?? false };
 }

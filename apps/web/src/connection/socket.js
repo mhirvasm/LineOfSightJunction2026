@@ -50,6 +50,7 @@ export function connectHub({ role, targetId, onSnapshot, onStatus, onError, WebS
   }
   open();
   return {
+    getSnapshot() { return snapshot; },
     send(event) {
       if (disposed || rejected || !snapshot || socket.readyState !== 1) return false;
       socket.send(JSON.stringify({ ...event, v: 1, run_id: snapshot.run_id }));
