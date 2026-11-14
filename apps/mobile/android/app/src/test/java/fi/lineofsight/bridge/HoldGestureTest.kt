@@ -40,4 +40,31 @@ class HoldGestureTest {
         gesture.move(300f, 0f); gesture.up()
         assertEquals(listOf("capture", "cancel:c"), actions)
     }
+
+    @Test fun oldAppliedSnapshotDuringCaptureDoesNotConsumeNewHold() {
+        val old = snapshot("APPLIED").copy(captureId = "previous")
+        lateinit var nextGesture: HoldGesture
+        nextGesture = HoldGesture(
+            { nextGesture.update(old); "new-capture" },
+            { actions.add("cancel:$it") },
+            { _, intent -> actions.add("confirm:${intent.previewId}"); true },
+        )
+        nextGesture.update(old)
+        nextGesture.down(0f, 0f)
+        nextGesture.update(snapshot("PREVIEW", "new-preview").copy(captureId = "new-capture"))
+        nextGesture.move(100f, 0f)
+        nextGesture.up()
+        assertEquals(listOf("confirm:new-preview"), actions)
+    }
+
+    @Test fun releaseOfNewHoldStillCancelsWhileOldApplyIsVisible() {
+        val old = snapshot("APPLIED").copy(captureId = "previous")
+        lateinit var nextGesture: HoldGesture
+        nextGesture = HoldGesture({ nextGesture.update(old); "new" }, { actions.add(it) }, { _, _ -> true })
+        nextGesture.update(old)
+        nextGesture.down(0f, 0f)
+        nextGesture.update(old)
+        nextGesture.up()
+        assertEquals(listOf("new"), actions)
+    }
 }

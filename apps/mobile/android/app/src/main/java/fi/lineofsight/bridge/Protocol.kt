@@ -34,6 +34,8 @@ data class HubSnapshot(
     val visionMessage: String,
     val amount: String,
     val captureId: String? = null,
+    val merchant: String? = null,
+    val receiptDate: String? = null,
 ) {
     companion object {
         fun parse(json: JSONObject): HubSnapshot {
@@ -48,7 +50,8 @@ data class HubSnapshot(
                 vision?.nullable("detected_target_id"), json.nullable("target_id"),
                 json.nullable("preview_id"), json.optBoolean("can_confirm"),
                 json.optString("source_mode", "unknown") + " / " + json.optString("extraction_provider", "unknown"), json.optString("feedback"),
-                vision?.optString("message").orEmpty(), amount, json.nullable("capture_id"))
+                vision?.optString("message").orEmpty(), amount, json.nullable("capture_id"),
+                receipt?.nullable("merchant"), receipt?.nullable("date"))
         }
     }
 }

@@ -149,6 +149,17 @@ class WorkflowChecks(unittest.IsolatedAsyncioTestCase):
             self.assertIsNone(self.h.receipt)
             self.assertEqual(self.h.state, 'STOPPED')
 
+    async def test_provider_timeout_is_visible_without_a_draft_write(self):
+        async def slow_provider(image):
+            raise httpx.ReadTimeout('test timeout')
+        self.h.workflow.reader = slow_provider
+        self.capture()
+        await self.h.workflow.task
+        self.assertEqual(self.h.state, 'READY')
+        self.assertIsNone(self.h.receipt)
+        self.assertIn('timed out', self.h.feedback)
+        self.assertEqual(self.h.drafts, dict(expenses=None, json=None))
+
 
 class ExtractionChecks(unittest.IsolatedAsyncioTestCase):
     async def test_validation(self):

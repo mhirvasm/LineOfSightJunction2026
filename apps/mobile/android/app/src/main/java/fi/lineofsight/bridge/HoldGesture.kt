@@ -11,6 +11,7 @@ class HoldGesture(
     var threshold = 80f
     var held = false
         private set
+    val hasCapture: Boolean get() = captureId != null
     private var consumed = false
     private var captureId: String? = null
     private var snapshot: HubSnapshot? = null
@@ -26,7 +27,7 @@ class HoldGesture(
         val ready = next?.captureId == captureId && next?.state in setOf("HOLDING", "PREVIEW")
         val nextKey = if (ready) "${next?.runId}:${next?.previewId}:${next?.target}" else null
         if (key != nextKey) { originX = x; originY = y; key = nextKey }
-        if (held && next?.state == "APPLIED") consumed = true
+        if (held && captureId != null && next?.captureId == captureId && next?.state == "APPLIED") consumed = true
     }
 
     fun down(px: Float, py: Float) {

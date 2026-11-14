@@ -3,6 +3,7 @@
 import asyncio
 from pathlib import Path
 import sys
+from time import monotonic
 
 import cv2
 import numpy as np
@@ -25,11 +26,12 @@ async def main():
     reader = ReceiptReader("live")
     for amount, minor in (("24.80", 2480), ("31.90", 3190)):
         jpeg = receipt_jpeg(amount)
+        started = monotonic()
         record = await reader(jpeg)
         assert record['total_minor'] == minor, 'Changed total was not read correctly'
         assert record['date'] == '2026-11-14'
         assert record['merchant'].casefold() == 'demo cafe'
-        print(f"Live synthetic receipt: EUR {amount}, merchant/date/validation passed")
+        print(f"Live synthetic receipt: EUR {amount}, merchant/date/validation passed in {monotonic() - started:.1f}s")
 
 
 if __name__ == '__main__':
