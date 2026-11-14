@@ -35,6 +35,8 @@ class Hub:
         self.reset()
 
     def reset(self):
+        if getattr(self, "vision", None):
+            self.vision.invalidate()
         self.run_id = str(uuid4())
         self.state = "STOPPED"
         self.receipt = None
@@ -42,6 +44,7 @@ class Hub:
         self.target_id = None
         self.preview_id = None
         self.active_stream_id = None
+        self.frame_source = None
         self.drafts = {"expenses": None, "json": None}
         self.capture_records = {}
         self.applied_commit_ids = set()
@@ -57,6 +60,7 @@ class Hub:
             "target_id": self.target_id, "preview_id": self.preview_id,
             "can_confirm": False, "drafts": self.drafts,
             "last_commit": self.last_commit, "feedback": self.feedback, "error": None,
+            "vision": self.vision.snapshot() if getattr(self, "vision", None) else None,
             "connections": {
                 "mobile": "mobile" in self.clients,
                 "targets": {target: f"target:{target}" in self.clients for target in sorted(TARGET_IDS)},
@@ -79,12 +83,15 @@ class Hub:
         return client, None
 
     def stop_interaction(self):
+        if getattr(self, "vision", None):
+            self.vision.invalidate()
         self.state = "STOPPED"
         self.receipt = None
         self.capture_id = None
         self.preview_id = None
         self.target_id = None
         self.active_stream_id = None
+        self.frame_source = None
         self.feedback = "Controller paused or disconnected. A new Start will be required when workflow is implemented."
 
     def unbind(self, client):
@@ -125,6 +132,19 @@ class Hub:
                 return False, ("forbidden", "Only an operator can reset the demo.")
             self.reset()
             return True, None
+        action = event.get("action")
+        if kind == "ACTION" and isinstance(action, str) and action in {"START", "STOP"}:
+            if client.role != "mobile":
+                return False, ("forbidden", "Only the active phone can start or stop its camera test.")
+            if action == "STOP":
+                self.stop_interaction()
+                return True, None
+            if self.state != "STOPPED":
+                return False, None
+            self.stop_interaction()
+            self.state = "READY"
+            self.feedback = "Phone camera test ready. Receipt capture and transfers are not implemented yet."
+            return True, None
         if kind in {"STREAM_STARTED", "DEVICE_PAUSED"}:
             if client.role != "mobile":
                 return False, ("forbidden", "Only the active mobile controller can send this event.")
@@ -139,7 +159,15 @@ class Hub:
             except ValueError:
                 return False, ("invalid_stream", "stream_id must be a UUID string.")
             changed = stream_id != self.active_stream_id
+            source = event.get("input_source", "unspecified")
+            if not isinstance(source, str) or source not in {"unspecified", "phone_photo", "camera_stream", "fixture_frames", "native_camera"}:
+                return False, ("invalid_event", "Unknown frame input source label.")
+            if changed and getattr(self, "vision", None):
+                self.vision.invalidate()
+                self.target_id = None
+                self.preview_id = None
             self.active_stream_id = stream_id
+            self.frame_source = source
             return changed, None
         return False, ("not_implemented", "This event belongs to a later workflow task; no draft was changed.")
 

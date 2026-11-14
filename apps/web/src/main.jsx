@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import targets from '../../../contracts/targets.json';
 import { useHub } from './connection/useHub.js';
+import { PhotoTest, VisionStatus } from './phone/PhotoTest.jsx';
 import './styles.css';
 
 const money = (record) => record?.total_minor == null ? 'Unreadable' :
@@ -12,7 +13,7 @@ function Header() {
 }
 
 function Footer({ runId }) {
-  return <footer><span>LineOfSight / Junction 2026 / shared hub connection test</span><span>Hub run: <code>{runId ?? 'waiting for connection'}</code></span></footer>;
+  return <footer><span>LineOfSight / Junction 2026 / shared hub and marker test</span><span>Hub run: <code>{runId ?? 'waiting for connection'}</code></span></footer>;
 }
 
 function Status({ status, error }) {
@@ -43,7 +44,7 @@ function TargetShell({ targetId, snapshot, status, error, example = false, child
   useEffect(() => { document.title = `${target.label} · LineOfSight`; }, [target.label]);
   return <div className="app-shell"><Header /><main>
     <div className="page-heading"><div><p className="eyebrow">REGISTERED DESTINATION / {target.marker_id}</p><h1>{target.label}</h1><p className="subtitle">Look here. Review the receipt. Confirm deliberately.</p></div><Status status={status} error={error} /></div>
-    <div className="fixture-notice"><strong>{example ? 'Predetermined layout example' : 'Shared connection test'}</strong><span>{example ? 'This page shows local sample data and has no hub socket.' : 'This page receives real server updates. Camera capture, receipt reading, and transfers are not connected yet.'}</span></div>
+    <div className="fixture-notice"><strong>{example ? 'Predetermined layout example' : 'Shared marker test'}</strong><span>{example ? 'This page shows local sample data and has no hub socket.' : 'This page receives shared updates and phone-frame marker results. Glasses capture, receipt reading, and transfers are not connected yet.'}</span></div>
     <div className="workspace">
       <section className="marker-panel" aria-label={`${target.label} target marker`}><div className="panel-top"><span>YOUR TARGET</span><span>MARKER {target.marker_id}</span></div><div className="marker-tile"><img src={target.marker_asset} alt={`ArUco DICT_4X4_50 marker ${target.marker_id}`} width="600" height="600" /></div><h2>{target.label}</h2><p>Keep this marker visible to the glasses.</p><span className="dictionary">DICT_4X4_50 · ID {target.marker_id}</span></section>
       <div className="data-column">
@@ -51,7 +52,7 @@ function TargetShell({ targetId, snapshot, status, error, example = false, child
         <section className="card applied-card"><div className="card-title"><h2>Applied {targetId === 'json' ? 'JSON' : 'expense draft'}</h2><span className="read-only">READ ONLY</span></div><Receipt record={snapshot?.drafts[targetId]} targetId={targetId} /></section>
       </div>
     </div>
-    {example ? children : <><Connections snapshot={snapshot} /><p className="example-link"><a href={`${target.route}?fixture=PREVIEW_${targetId}`}>Open the separate layout examples</a></p></>}
+    {example ? children : <><VisionStatus snapshot={snapshot} /><Connections snapshot={snapshot} /><p className="example-link"><a href={`${target.route}?fixture=PREVIEW_${targetId}`}>Open the separate layout examples</a></p></>}
   </main><Footer runId={snapshot?.run_id} /></div>;
 }
 
@@ -92,10 +93,12 @@ function TestPage({ operator }) {
     if (hub.send({ type: 'RESET' })) setPendingRun(hub.snapshot.run_id);
   }
   return <div className="app-shell"><Header /><main>
-    <div className="page-heading"><div><p className="eyebrow">B1 / SHARED CONNECTION TEST</p><h1>{title}</h1></div><Status status={hub.status} error={hub.error} /></div>
-    <div className="fixture-notice"><strong>{operator ? 'Operator controls' : 'SIMULATED PHONE · no glasses connected'}</strong><span>{operator ? 'Reset clears the entire shared run and both drafts.' : 'This browser occupies the phone connection for testing. Close it before connecting a real native app.'}</span></div>
+    <div className="page-heading"><div><p className="eyebrow">PHONE / SCREEN MARKER TEST</p><h1>{title}</h1></div><Status status={hub.status} error={hub.error} /></div>
+    <div className="fixture-notice"><strong>{operator ? 'Operator controls' : 'PHONE CAMERA FALLBACK · no glasses connected'}</strong><span>{operator ? 'Reset clears the entire shared run and both drafts.' : 'This browser occupies the phone connection. Its optional photo test uses phone images, not glasses input. Close it before connecting a native app.'}</span></div>
     <Connections snapshot={hub.snapshot} />
-    <section className="card test-controls"><h2>{operator ? 'Test the shared connection' : 'What this proves'}</h2><p>{operator ? 'Open Expenses, JSON, and Test phone. Check that all three appear above. Press Reset, then check that every page receives the same new hub run number.' : 'The server can communicate with a third client using the phone role. It does not prove camera access, receipt reading, or Neural Band input.'}</p>{operator && <button className="primary-button" disabled={hub.status !== 'Connected' || Boolean(pending)} onClick={reset}>{pending ? 'Resetting…' : 'Reset demo run'}</button>}<p>Current state: <strong>{hub.snapshot?.state ?? 'Waiting'}</strong></p><p>{hub.snapshot?.feedback}</p></section>
+    {!operator && <PhotoTest hub={hub} />}
+    <VisionStatus snapshot={hub.snapshot} />
+    <section className="card test-controls"><h2>{operator ? 'Test the shared connection' : 'What this proves'}</h2><p>{operator ? 'Open Expenses, JSON, and Test phone. Check that all three appear above. Press Reset, then check that every page receives the same new hub run number.' : 'The server can receive a phone photo and recognize its registered screen marker. This does not prove glasses camera access, receipt reading, or Neural Band input.'}</p>{operator && <button className="primary-button" disabled={hub.status !== 'Connected' || Boolean(pending)} onClick={reset}>{pending ? 'Resetting…' : 'Reset demo run'}</button>}<p>Current state: <strong>{hub.snapshot?.state ?? 'Waiting'}</strong></p><p>{hub.snapshot?.feedback}</p></section>
   </main><Footer runId={hub.snapshot?.run_id} /></div>;
 }
 
