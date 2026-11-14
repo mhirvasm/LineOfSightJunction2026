@@ -1,5 +1,24 @@
 # LineOfSight
 
+## Current demo: Android text grab and receipts
+
+Use Android 0.3.0 with the hub on the same network. Hold to capture text or a
+receipt, face a registered destination, and drag right to paste; release cancels.
+Open `/text` (marker 30) for raw transcription, `/expense` (10) for a validated EUR
+receipt, or `/json` (20) for receipt fields or a text object. The destination
+selects the output; no content-mode menu is needed. Text is pasted into the
+receiving webpage. General OS clipboard and third-party app insertion are not
+implemented. Handwriting and glasses checks are still pending.
+
+Start the configured hub with `.venv/Scripts/python.exe scripts/run_hub.py` on
+Windows, or `python scripts/run_hub.py` in the activated Mac environment. Copy
+`.env.example` to the ignored `.env` and configure live mode/provider locally.
+Never commit keys. Build web changes with `npm --prefix apps/web run build`.
+
+See [raw text build and phone retest](docs/tasks/raw-text-grab.md) for exact checks,
+startup commands and the prior verified build. Earlier sections below record the
+foundation and original receipt-only setup; the current protocol takes precedence.
+
 Junction prototype: capture a synthetic receipt through Meta Ray-Ban Display
 glasses, look toward Expenses or JSON, preview the amount, and deliberately
 confirm a transfer with a supported Neural Band/display action.

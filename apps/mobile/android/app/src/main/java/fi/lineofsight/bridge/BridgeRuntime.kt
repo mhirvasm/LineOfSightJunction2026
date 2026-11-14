@@ -82,13 +82,15 @@ class BridgeRuntime private constructor(private val context: Context) {
             !rawInputs && !gesture.held && fresh && !hub.busy && hub.guard.active != null && hub.status == "Connected"
         }
         val title = when (s?.state) {
-            "READING" -> "Reading receipt"
-            "PREVIEW" -> "${s.target?.replaceFirstChar { it.uppercase() }} ${s.amount}"
-            "HOLDING" -> "Receipt held"
-            "APPLIED" -> "Receipt sent"
+            "READING" -> "Reading text"
+            "PREVIEW" -> "${s.target?.replaceFirstChar { it.uppercase() }} ${if (s.target == "text" || s.amount.isBlank()) "${s.text?.length ?: 0} characters" else s.amount}"
+            "HOLDING" -> if (s.amount.isBlank()) "Text held" else "Receipt held"
+            "APPLIED" -> "Sent"
             else -> "Hold to capture"
         }
-        sdk.showCard(title, "${s?.receiptMode ?: "unknown"}: ${s?.feedback ?: "Connect and start"}", intent) {
+        val excerpt = s?.text?.takeIf { s.state in setOf("HOLDING", "PREVIEW") && (s.target == "text" || s.amount.isBlank()) }?.let { it.take(180) + if (it.length > 180) "..." else "" }
+        val body = listOfNotNull(excerpt, "${s?.receiptMode ?: "unknown"}: ${s?.feedback ?: "Connect and start"}").joinToString("\n")
+        sdk.showCard(title, body, intent) {
             if (!rawInputs) hub.perform(it, frame)
         }
         changed()

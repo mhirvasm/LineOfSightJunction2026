@@ -36,6 +36,16 @@ class ProtocolTest {
         assertNull(ActionPolicy.current(parsed, true))
     }
 
+    @Test fun `text preview preserves newlines and confirms without receipt fields`() {
+        val data = JSONObject("""{"v":1,"type":"SNAPSHOT","run_id":"${UUID.randomUUID()}","state":"PREVIEW","target_id":"text","capture_id":"capture","preview_id":"text-preview","can_confirm":true,"receipt":null,"text":"Hyvää päivää!\n<em>literal</em>"}""")
+        val parsed = HubSnapshot.parse(data)
+        assertEquals("Hyvää päivää!\n<em>literal</em>", parsed.text)
+        assertEquals("", parsed.amount)
+        assertEquals("text", parsed.target)
+        assertEquals("text-preview", ActionPolicy.current(parsed, true)?.previewId)
+        assertNull(ActionPolicy.current(parsed.copy(state = "HOLDING", canConfirm = false, previewId = null), true))
+    }
+
     @Test fun `old confirmation cannot follow a changed target preview or reset run`() {
         val old = snapshot("PREVIEW", "expenses-preview", true)
         val action = requireNotNull(ActionPolicy.current(old, true))

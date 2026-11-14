@@ -24,13 +24,13 @@ class FoundationChecks(unittest.TestCase):
             self.assertEqual(first["v"], 1)
             self.assertIs(first["ok"], True)
             UUID(first["run_id"])
-            self.assertEqual(application.state.hub.drafts, {"expenses": None, "json": None})
+            self.assertEqual(application.state.hub.drafts, {"expenses": None, "json": None, "text": None})
         with TestClient(application) as client:
             self.assertNotEqual(first["run_id"], client.get("/health").json()["run_id"])
 
     def test_both_routes_assets_and_fixtures_are_served(self):
         with TestClient(create_app()) as client:
-            for route in ["/expense", "/json"]:
+            for route in ["/expense", "/json", "/text"]:
                 response = client.get(route)
                 self.assertEqual(response.status_code, 200, response.text)
                 self.assertIn('<div id="root">', response.text)
@@ -38,7 +38,7 @@ class FoundationChecks(unittest.TestCase):
             import re
             for asset in re.findall(r'(?:src|href)="(/assets/[^\"]+)"', index):
                 self.assertEqual(client.get(asset).status_code, 200, asset)
-            for marker_id in (10, 20):
+            for marker_id in (10, 20, 30):
                 response = client.get(f"/markers/aruco-{marker_id}.png")
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(response.headers["content-type"], "image/png")
@@ -50,7 +50,7 @@ class FoundationChecks(unittest.TestCase):
         targets = json.loads((ROOT / "contracts/targets.json").read_text())
         dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
         detector = cv2.aruco.ArucoDetector(dictionary)
-        for target_id, marker_id, route in [("expenses", 10, "/expense"), ("json", 20, "/json")]:
+        for target_id, marker_id, route in [("expenses", 10, "/expense"), ("json", 20, "/json"), ("text", 30, "/text")]:
             target = targets[target_id]
             self.assertEqual((target["route"], target["marker_id"], target["dictionary"]),
                              (route, marker_id, "DICT_4X4_50"))
@@ -79,11 +79,13 @@ class FoundationChecks(unittest.TestCase):
             self.assertEqual(snapshot["type"], "SNAPSHOT")
             if snapshot["can_confirm"]:
                 self.assertEqual(snapshot["state"], "PREVIEW")
-                self.assertEqual(snapshot["receipt"], receipt)
+                self.assertTrue(snapshot["text"])
+                if snapshot["target_id"] != "text":
+                    self.assertEqual(snapshot["receipt"], receipt)
                 self.assertIsNotNone(snapshot["preview_id"])
-                self.assertEqual(snapshot["drafts"], {"expenses": None, "json": None})
+                self.assertEqual(snapshot["drafts"], {"expenses": None, "json": None, "text": None})
         self.assertNotEqual(snapshots["PREVIEW_expenses"]["preview_id"], snapshots["PREVIEW_json"]["preview_id"])
-        self.assertEqual(snapshots["APPLIED"]["drafts"], {"expenses": None, "json": receipt})
+        self.assertEqual(snapshots["APPLIED"]["drafts"], {"expenses": None, "json": receipt, "text": None})
         invalid = json.loads((fixture_dir / "receipt_invalid.json").read_text())
         self.assertIn("total_minor", invalid["needs_review"])
         self.assertNotIn("tax_minor", invalid["needs_review"])

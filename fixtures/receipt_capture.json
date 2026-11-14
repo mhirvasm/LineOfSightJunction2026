@@ -1,0 +1,11 @@
+{
+  "text": "DEMO CAFE\nReceipt\nDate: 2026-11-14\nCoffee and lunch\nTOTAL: EUR 24.80\nThank you",
+  "receipt": {
+    "merchant": "Demo Cafe",
+    "date": "2026-11-14",
+    "total_minor": 2480,
+    "currency": "EUR",
+    "tax_minor": null,
+    "needs_review": []
+  }
+}

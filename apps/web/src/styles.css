@@ -50,6 +50,9 @@ h1 { margin: 0; font-size: clamp(35px, 4vw, 48px); letter-spacing: -1.8px; font-
 .receipt-fields dt { color: #73816a; flex-shrink: 0; }
 .receipt-fields dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
 pre { font-size: 12px; line-height: 1.6; background: #f5f7f2; border: 1px solid #e5eadf; padding: 15px; border-radius: 7px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.text-preview, .pasted-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.65; font-size: 18px; user-select: text; overflow-y: auto; padding: 16px 0; }
+.text-preview { max-height: 220px; }
+.pasted-text { max-height: 460px; }
 .muted { color: #76826d; font-size: 12px; }
 .fixture-controls { display: flex; justify-content: space-between; gap: 20px; align-items: center; padding: 20px 0 0; margin-top: 22px; border-top: 1px solid #dce3d7; }
 .fixture-controls h2 { margin: 0 0 6px; font-size: 13px; }

@@ -12,7 +12,7 @@ if config.exists():
         if not line.strip() or line.lstrip().startswith("#"):
             continue
         key, separator, value = line.partition("=")
-        if separator and key.strip() in {"LOS_EXTRACTION_MODE", "LOS_EXTRACTION_PROVIDER", "OPENAI_API_KEY", "LOS_OPENAI_MODEL", "GEMINI_API_KEY", "LOS_GEMINI_MODEL"}:
+        if separator and key.strip() in {"LOS_EXTRACTION_MODE", "LOS_FIXTURE_CONTENT", "LOS_EXTRACTION_PROVIDER", "OPENAI_API_KEY", "LOS_OPENAI_MODEL", "GEMINI_API_KEY", "LOS_GEMINI_MODEL"}:
             os.environ.setdefault(key.strip(), value.strip())
 
 if __name__ == "__main__":
