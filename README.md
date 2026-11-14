@@ -4,12 +4,44 @@ Junction prototype: capture a synthetic receipt through Meta Ray-Ban Display
 glasses, look toward Expenses or JSON, preview the amount, and deliberately
 confirm a transfer with a supported Neural Band/display action.
 
-**Current milestone: K0 foundation, fixture UI only.** A real FastAPI server
-provides `/health` and serves both React target pages. The marker PNGs are
-generated with OpenCV. Receipt previews and applied-data examples are
-predetermined fixtures. Camera input, wristband actions, extraction,
-WebSockets, transfers, Reset, Send Again, and Undo are not implemented yet.
-No provider key is needed to run this foundation.
+**Current milestone: B1 shared connection test.** One FastAPI server now
+connects both React target screens and a simulated phone through WebSockets.
+The operator page shows which clients are connected. Its Reset button changes
+the shared run number on every connected page and clears both in-memory drafts.
+The marker PNGs are generated with OpenCV. Camera input, wristband actions,
+receipt extraction, actual targeting, transfers, Send Again, and Undo are not
+implemented yet. No provider key is needed for this connection test.
+
+## Test it now
+
+With the server running, open each link once in a separate tab/window:
+
+1. [Expenses](http://127.0.0.1:8000/expense)
+2. [JSON](http://127.0.0.1:8000/json)
+3. [Test phone](http://127.0.0.1:8000/fixture-mobile) (a browser pretending to be the phone connection)
+4. [Operator](http://127.0.0.1:8000/operator)
+
+On Operator, all three listed connections should say **Connected**. Find
+the **Hub run** number at the bottom of each page: they must match. Press
+**Reset demo run** on Operator. All four pages must show the same new run
+number without refreshing. Close the test-phone tab: Operator should show
+that the phone is no longer connected. Reopen it and the connection returns.
+
+This proves real shared communication between the clients and server. It
+does not yet prove receipt capture, screen selection, or a transfer. Both
+drafts remain empty. The test phone does not use the camera or Neural Band.
+Close that page before connecting a real native phone app.
+
+Only one connected tab per destination is allowed. A duplicate tab shows
+**Connection rejected**; close it. If you closed the original and want to
+use the rejected tab, refresh it once. Ordinary network disconnections retry
+after 1.5 seconds; old actions are never replayed.
+
+The old standalone layout examples remain at
+`/expense?fixture=PREVIEW_expenses` and `/json?fixture=PREVIEW_json`.
+Those examples have no hub socket and cannot change shared state.
+
+When testing from another device, replace `127.0.0.1` with the actual hub IP.
 
 | Destination | URL | Target ID | ArUco marker |
 | --- | --- | --- | --- |
@@ -76,13 +108,13 @@ Run from the folder where you keep projects:
 ```sh
 git clone https://github.com/mhirvasm/LineOfSightJunction2026.git
 cd LineOfSightJunction2026
-git switch chore/k0-bootstrap
+git switch feat/b1-shared-hub
 ```
 
-**The bootstrap branch must be uploaded to GitHub before another machine
-can clone it.** Linking a local Git remote does not upload files. If
+The shared-connection work is on `feat/b1-shared-hub`, based on the published
+bootstrap. Linking a local Git remote does not upload files. If
 the repository is empty or `git switch` reports that the branch is missing,
-stop and have the integration owner share the committed bootstrap branch. If it has
+stop and have the integration owner share the committed task branch. If it has
 already been reviewed and merged, use the branch containing this README.
 
 For a private repository, sign in with an account that has access using
@@ -112,12 +144,16 @@ do not delete the lockfile to work around an installation error.
 ```sh
 npm --prefix apps/web run build
 python scripts/verify_foundation.py
+python scripts/verify_hub.py
+python scripts/verify_hub_server.py
+npm --prefix apps/web test
 ```
 
-Expected: a successful Vite build and four passing checks covering the
-health/run lifecycle, both routes/assets, marker decoding, and fixture
-contract consistency. These checks require the web build from the preceding
-command. They do not test glasses, extraction, or the network between devices.
+Expected: a successful Vite build, four foundation checks, six hub checks,
+four JavaScript connection checks, and a real-server WebSocket smoke test.
+The server smoke test starts and stops its own isolated temporary hub; it
+does not reset the hub you are using. The foundation checks require the web
+build. These tests do not verify glasses, extraction, or cross-device networking.
 
 Generated markers and fixture snapshots are committed, so generation is
 not needed for a normal clone. If you intentionally need to regenerate them:
@@ -148,8 +184,8 @@ open http://127.0.0.1:8000/json
 Health returns `{"v":1,"ok":true,"run_id":"<UUID>"}`. Repeated requests
 within one server run have the same UUID. A restart creates a new run.
 Both pages must show **FIXTURE MODE**, the correct target name/marker, and
-**WebSocket not connected**. This is the expected K0 behavior. The fixture
-selector changes local UI examples only; it never performs a transfer.
+**Connected**. Their state starts at STOPPED with empty drafts. Follow
+"Test it now" above to verify shared communication and Reset.
 
 ## Check the private network before the device slot
 
@@ -204,6 +240,9 @@ py -3.12 -m venv .venv
 npm --prefix apps/web ci
 npm --prefix apps/web run build
 .\.venv\Scripts\python.exe scripts/verify_foundation.py
+.\.venv\Scripts\python.exe scripts/verify_hub.py
+.\.venv\Scripts\python.exe scripts/verify_hub_server.py
+npm --prefix apps/web test
 .\.venv\Scripts\python.exe -m uvicorn services.hub.app:app --host 0.0.0.0 --port 8000
 ```
 
@@ -240,8 +279,9 @@ superseded by the root single-agent policy.
   together on the actual hardware. Record separate results for camera,
   display, input, and simultaneous operation. The native platform is still
   undecided; the available iPhone/S23 and Macs/ThinkPad do not decide it.
-- **B1, next software task:** add the in-memory WebSocket hub and shared
-  snapshots. This bootstrap includes health but does not complete B1.
+- **B2, next software task:** detect the real marker pixels and choose a
+  stable target. B1 now supplies the shared WebSocket hub; capture and
+  transfer behavior still require B3/B4 and the extraction tasks.
 - Continue the dependency order in [`contracts/task-plan.json`](contracts/task-plan.json).
   Keep both destinations throughout. Hardware integration and live extraction
   need their own verification before they can be presented as working.
@@ -251,6 +291,8 @@ K0 task scope and ownership are recorded in
 [`docs/ownership.md`](docs/ownership.md). Actual checks and outstanding Mac,
 network, and hardware verification are in
 [`docs/verification.md`](docs/verification.md).
+B1 scope, optional connection-status metadata, actual checks, and limitations
+are recorded in [`docs/tasks/B1-shared-hub.md`](docs/tasks/B1-shared-hub.md).
 
 Preserve these later workflow requirements: freeze the exact capture image;
 keep unchanged previews stable; confirm the exact displayed preview; apply
