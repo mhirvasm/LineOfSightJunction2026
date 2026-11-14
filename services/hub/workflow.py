@@ -10,13 +10,15 @@ import httpx
 
 from .extraction.receipt import ProviderError
 from .extraction.content import ContentReader, validate_content
+from .extraction.analysis import TextAnalyzer, validate_analysis
 from .vision.service import FrameRejected
 
 
 class ReceiptWorkflow:
-    def __init__(self, hub, reader=None):
+    def __init__(self, hub, reader=None, analyzer=None):
         self.hub = hub
         self.reader = reader or ContentReader()
+        self.analyzer = analyzer or TextAnalyzer(mode=self.reader.mode, provider=self.reader.provider)
         self.task = None
         self.pending = set()
         self.sent_at = None
@@ -34,6 +36,10 @@ class ReceiptWorkflow:
         self.invalidate()
         h = self.hub
         h.capture_id = h.receipt = h.text = h.preview_id = None
+        h.raw_text = h.summary = None
+        h.text_status = "raw"
+        h.interaction_kind = "content"
+        h.coffee_desired = None
         if h.state != "STOPPED":
             h.state = "READY"
         h.feedback = message
@@ -60,6 +66,14 @@ class ReceiptWorkflow:
                 h.preview_id = None
                 h.state = "HOLDING"
                 h.feedback = "Held. Look at a screen; release to cancel."
+            elif h.interaction_kind == "coffee" and target != "coffee":
+                h.preview_id = None
+                h.state = "HOLDING"
+                h.feedback = "Coffee selected. Aim at its marker; release to cancel."
+            elif h.interaction_kind != "coffee" and target == "coffee":
+                h.preview_id = None
+                h.state = "HOLDING"
+                h.feedback = "Text cannot control Coffee. Release, then hold while aiming at Coffee."
             elif target == "expenses" and not h.receipt:
                 h.preview_id = None
                 h.state = "HOLDING"
@@ -68,8 +82,13 @@ class ReceiptWorkflow:
                 if changed_target or not h.preview_id:
                     h.preview_id = str(uuid4())
                 h.state = "PREVIEW"
-                summary = f"EUR {h.receipt['total_minor'] / 100:.2f}" if h.receipt and target != "text" else f"{len(h.text)} characters"
-                h.feedback = f"{target.title()} / {summary} / drag right to send"
+                if h.interaction_kind == "coffee":
+                    h.feedback = f"Coffee / turn {'on' if h.coffee_desired else 'off'} / drag right to confirm"
+                else:
+                    summary = f"EUR {h.receipt['total_minor'] / 100:.2f}" if h.receipt and target != "text" else f"{len(h.text)} characters"
+                    h.feedback = f"{target.title()} / {summary} / drag right to send"
+            if h.text_status == "unavailable":
+                h.feedback = "Cleanup unavailable; original text. " + h.feedback
         if h.last_commit and h.last_commit["display_status"] == "waiting":
             if (self.sent_at is not None and monotonic() - self.sent_at > 3) or f"target:{h.last_commit['target_id']}" not in h.clients:
                 h.last_commit["display_status"] = "not_confirmed"
@@ -101,6 +120,10 @@ class ReceiptWorkflow:
             raise FrameRejected("Finish or cancel the current capture first.")
         h.capture_records[capture] = {"digest": digest, "status": "reading"}
         h.capture_id, h.receipt, h.text, h.preview_id = capture, None, None, None
+        h.raw_text = h.summary = None
+        h.text_status = "raw"
+        h.interaction_kind = "content"
+        h.coffee_desired = None
         h.state, h.feedback = "READING", "Reading text. Keep holding; release to cancel."
         self.task = asyncio.create_task(self.read(run, capture, image, owner))
         self.pending.add(self.task)
@@ -121,12 +144,33 @@ class ReceiptWorkflow:
             record, failure = None, "Could not read text. Capture a shorter, clearer block and check live configuration."
         if run != h.run_id or h.capture_id != capture or h.clients.get("mobile") is not owner or h.state != "READING":
             return
-        self.task = None
-        h.capture_records[capture]["status"] = "failed" if failure else "read"
         if failure:
+            self.task = None
+            h.capture_records[capture]["status"] = "failed"
             self.clear(failure)
         else:
-            h.receipt, h.text, h.state = record["receipt"], record["text"], "HOLDING"
+            h.receipt = record["receipt"]
+            h.text = h.raw_text = record["text"]
+            if h.receipt is None:
+                h.text_status = "processing"
+                h.feedback = "Text read. Correcting grammar and summarizing; keep holding."
+                await h.broadcast()
+                try:
+                    analysis = validate_analysis(await asyncio.wait_for(self.analyzer(record["text"]), 25), record["text"])
+                except asyncio.CancelledError:
+                    return
+                except Exception:
+                    analysis = None
+                if run != h.run_id or h.capture_id != capture or h.clients.get("mobile") is not owner or h.state != "READING":
+                    return
+                if analysis:
+                    h.text, h.summary = analysis["corrected_text"], analysis["summary"]
+                    h.text_status = "ready"
+                else:
+                    h.text_status = "unavailable"
+            self.task = None
+            h.capture_records[capture]["status"] = "read"
+            h.state = "HOLDING"
             self.refresh()
         await h.broadcast()
 
@@ -145,6 +189,28 @@ class ReceiptWorkflow:
         if client.role != "mobile":
             return False, ("forbidden", "Only the active phone can change captures.")
         action = event.get("action")
+        if action == "SELECT_COFFEE":
+            capture = event.get("capture_id")
+            try:
+                UUID(capture)
+            except (ValueError, TypeError, AttributeError):
+                return False, ("invalid_capture", "Coffee selection requires a new interaction UUID.")
+            previous = h.capture_records.get(capture)
+            if previous:
+                if previous.get("digest") == "coffee" and previous.get("status") != "canceled":
+                    return False, None
+                return False, ("invalid_capture", "Interaction already used or canceled.")
+            if len(h.capture_records) >= 1000:
+                return False, ("capacity", "Reset explicitly before more selections.")
+            if h.state not in {"READY", "APPLIED"} or not h.active_stream_id or self.fresh_target() != "coffee":
+                return False, ("unavailable", "Aim at a connected Coffee marker before holding.")
+            self.clear()
+            h.capture_records[capture] = {"digest": "coffee", "status": "selected"}
+            h.capture_id, h.interaction_kind = capture, "coffee"
+            h.coffee_desired = not h.coffee_on
+            h.state = "HOLDING"
+            self.refresh()
+            return True, None
         if action == "CANCEL":
             capture = event.get("capture_id")
             try:
@@ -165,7 +231,7 @@ class ReceiptWorkflow:
                 return False, None
             old_preview = h.preview_id
             self.refresh()
-            if h.state != "PREVIEW" or preview != h.preview_id or not h.text or not h.target_id:
+            if h.state != "PREVIEW" or preview != h.preview_id or (not h.text and h.interaction_kind != "coffee") or not h.target_id:
                 if event.get("capture_id") == h.capture_id or preview == old_preview:
                     self.clear("Canceled: destination or preview expired.")
                     return True, None
@@ -173,8 +239,14 @@ class ReceiptWorkflow:
             if len(h.applied_commit_ids) >= 1000:
                 return False, ("capacity", "Reset explicitly before more transfers.")
             target = h.target_id
-            h.previous_draft = (target, deepcopy(h.drafts[target]))
-            h.drafts[target] = deepcopy(h.receipt) if target != "text" and h.receipt else {"text": h.text}
+            if h.interaction_kind == "coffee":
+                h.previous_draft = ("coffee", h.coffee_on)
+                h.coffee_on = h.coffee_desired
+            else:
+                h.previous_draft = (target, deepcopy(h.drafts[target]))
+                h.drafts[target] = deepcopy(h.receipt) if target != "text" and h.receipt else {
+                    "text": h.text, "raw_text": h.raw_text, "summary": h.summary, "text_status": h.text_status,
+                }
             h.applied_commit_ids.add(preview)
             h.last_commit = {"commit_id": preview, "target_id": target, "display_status": "waiting"}
             self.sent_at = monotonic()
@@ -183,9 +255,12 @@ class ReceiptWorkflow:
             return True, None
         if action == "UNDO" and h.previous_draft is not None and h.state in {"READY", "APPLIED"}:
             target, record = h.previous_draft
-            h.drafts[target] = record
+            if target == "coffee":
+                h.coffee_on = record
+            else:
+                h.drafts[target] = record
             h.previous_draft = h.last_commit = None
-            self.clear("Previous draft restored. Hold to capture again.")
+            self.clear("Previous coffee state restored." if target == "coffee" else "Previous draft restored. Hold to capture again.")
             return True, None
         if action == "SEND_AGAIN" and h.state == "APPLIED" and h.text:
             h.state, h.preview_id = "HOLDING", None

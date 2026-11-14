@@ -50,7 +50,7 @@ class ContentReader(ReceiptReader):
     max_output_tokens = 8192
     validate = staticmethod(validate_content)
 
-    def fixture(self):
+    def fixture(self, value=None):
         choice = os.environ.get("LOS_FIXTURE_CONTENT", "receipt")
         if choice not in {"receipt", "text"}:
             raise ValueError("LOS_FIXTURE_CONTENT must be receipt or text")

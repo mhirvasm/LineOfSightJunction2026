@@ -2,8 +2,10 @@
 
 Issue: [#16](https://github.com/mhirvasm/LineOfSightJunction2026/issues/16).
 Branch: `feat/raw-text-grab`. Agent author: Codex. Responsible human: `mhirvasm`.
-Baseline: `14f585d419d5ca7f09be9fdb784cfda0bdea90c0`, Android 0.2.1. Its
-versioned APK remains available locally for rollback. No main-branch merge.
+Baseline: `14f585d419d5ca7f09be9fdb784cfda0bdea90c0`, Android 0.2.1. This source
+commit remains available for rebuilding; later Gradle output cleanup removed its
+local versioned APK. Android 0.3.0 is now archived outside Gradle outputs at
+`runtime/apk-archive/LineOfSight-0.3.0.apk`. No main-branch merge.
 
 ## Result and scope
 

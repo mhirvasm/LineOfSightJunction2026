@@ -33,6 +33,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var threshold: EditText
     private lateinit var touchPad: TextView
     private lateinit var receiptPreview: TextView
+    private lateinit var summaryPreview: TextView
     private lateinit var interactionFeedback: TextView
     private lateinit var hub: HubClient
     private lateinit var sdk: MetaBridge
@@ -87,8 +88,8 @@ class MainActivity : ComponentActivity() {
             this.text = text; isAllCaps = false; setOnClickListener { run() }; content.addView(this)
         }
         label("Setup and diagnostics", 19f)
-        source = label("LineOfSight 0.3.0 / phone simulation", 13f)
-        label("Face a screen to choose Text, Expenses or JSON. No destination menu.")
+        source = label("LineOfSight 0.4.0 / phone simulation", 13f)
+        label("Face a screen to choose Text, Expenses, JSON or Coffee. No destination menu.")
         address = EditText(this).apply {
             hint = "http://YOUR-HUB-IP:8000"
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
@@ -155,6 +156,10 @@ class MainActivity : ComponentActivity() {
             setPadding(dp(12), dp(8), dp(12), dp(8))
         }
         recognition = label("Destination: None", 16f)
+        summaryPreview = label("", 14f).apply {
+            maxLines = 3
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        }
         interactionFeedback = label("Connect and start the camera below.", 14f).apply {
             minLines = 2
             maxLines = 3
@@ -164,7 +169,7 @@ class MainActivity : ComponentActivity() {
         primary = button("Capture workflow unavailable") { }
         button("Stop camera test") { stop() }
         button("Cancel capture") { runtime.gesture.abort(); (hub.snapshots.value?.captureId ?: hub.lastCaptureId)?.let { hub.cancelCapture(it) } }
-        button("Undo last transfer") { hub.sendAction("UNDO") }
+        button("Undo last action") { hub.sendAction("UNDO") }
         button("Send again (tap confirmation)") { if (!runtime.rawInputs) hub.sendAction("SEND_AGAIN") }
         label("SDK display preview / simulated selection", 19f)
         sdkState = label(runtime.sdkMessage)
@@ -186,7 +191,7 @@ class MainActivity : ComponentActivity() {
                 .onFailure { error, _ -> errorMessage = error.description; render() }
         }
         label("One controller only. Phone simulation stays foreground. Physical glasses use a foreground service with notification Stop. Live mode sends the captured image to the provider shown above.", 13f)
-        listOf(source, preview, receiptPreview, recognition, touchPad, interactionFeedback).forEach { view ->
+        listOf(source, preview, receiptPreview, summaryPreview, recognition, touchPad, interactionFeedback).forEach { view ->
             content.removeView(view)
             interaction.addView(view)
         }
@@ -255,25 +260,32 @@ class MainActivity : ComponentActivity() {
         if (!::primary.isInitialized) return
         val snapshot = hub.snapshots.value
         val active = hub.guard.active != null
-        source.text = "LineOfSight 0.3.0 / ${if (physical.isChecked) "glasses" else "phone simulation"} / ${snapshot?.receiptMode ?: "disconnected"}"
+        source.text = "LineOfSight 0.4.0 / ${if (physical.isChecked) "glasses" else "phone simulation"} / ${snapshot?.receiptMode ?: "disconnected"}"
         connection.text = "${hub.status}\nHub run: ${snapshot?.runId ?: "None"}"
         start.isEnabled = hub.status == "Connected" && !active && startJob?.isActive != true
         rotate.isEnabled = !active && startJob?.isActive != true
         physical.isEnabled = !active && startJob?.isActive != true
         rawBand.isEnabled = !active && startJob?.isActive != true
         threshold.isEnabled = !active && startJob?.isActive != true
-        val name: (String?) -> String = { if (it == "expenses") "Expenses" else if (it == "json") "JSON" else if (it == "text") "Text" else "None" }
+        val name: (String?) -> String = { if (it == "expenses") "Expenses" else if (it == "json") "JSON" else if (it == "text") "Text" else if (it == "coffee") "Coffee" else "None" }
         recognition.text = "Destination: ${name(snapshot?.target)}"
         receiptPreview.text = when {
+            snapshot?.interactionKind == "coffee" && snapshot.state == "APPLIED" -> "Coffee is ${if (snapshot.coffeeOn) "ON / brewing" else "OFF"}.\nHold and swipe again to toggle."
+            snapshot?.interactionKind == "coffee" -> "Turn coffee ${if (snapshot.coffeeDesired) "ON" else "OFF"}?\nKeep aiming at Coffee and swipe right."
+            snapshot?.canSelectCoffee == true -> "Coffee is ${if (snapshot.coffeeOn) "ON" else "OFF"}.\nHold below, then swipe right to toggle."
             hub.busy && snapshot?.state in setOf("READY", "APPLIED") -> "Capturing text...\nKeep holding."
+            snapshot?.state == "READING" && snapshot.textStatus == "processing" -> "Text read.\nCorrecting grammar and summarizing...\nKeep holding."
             snapshot?.state == "READING" -> "Reading text...\nKeep holding until the preview appears."
             snapshot?.state in setOf("HOLDING", "PREVIEW", "APPLIED") && !snapshot?.text.isNullOrBlank() && (snapshot?.target == "text" || snapshot?.amount.isNullOrBlank()) ->
-                "${if (snapshot?.state == "APPLIED") "Sent" else "Text held"}: ${snapshot?.text}"
+                "${if (snapshot?.state == "APPLIED") "Sent" else if (snapshot?.textStatus == "ready") "AI-corrected text" else "Original text"}: ${snapshot?.text}"
             snapshot?.state in setOf("HOLDING", "PREVIEW", "APPLIED") && !snapshot?.amount.isNullOrBlank() ->
                 "${if (snapshot?.state == "APPLIED") "Sent" else "Receipt held"}: ${snapshot?.amount}\n${snapshot?.merchant.orEmpty()}\n${snapshot?.receiptDate.orEmpty()}"
             else -> "No text held.\nAim at text or a receipt, then hold below."
         }
+        summaryPreview.text = snapshot?.summary?.let { "Summary: $it" }.orEmpty()
+        summaryPreview.visibility = if (snapshot?.summary.isNullOrBlank()) View.GONE else View.VISIBLE
         touchPad.text = when {
+            runtime.gesture.held && snapshot?.interactionKind == "coffee" && snapshot.state == "PREVIEW" -> "SLIDE RIGHT TO TURN ${if (snapshot.coffeeDesired) "ON" else "OFF"}\nRelease cancels."
             !active -> "Start the camera below to enable hold / drag"
             runtime.gesture.held && !runtime.gesture.hasCapture -> "CAPTURE NOT STARTED\nRelease, keep the camera steady, then hold again."
             runtime.gesture.held && hub.busy && snapshot?.state in setOf("READY", "APPLIED") -> "KEEP HOLDING\nCapturing text..."
@@ -297,8 +309,9 @@ class MainActivity : ComponentActivity() {
         val fresh = frame?.let { SystemClock.elapsedRealtime() - it.deliveredAtMs in 0..300 } == true
         val actionable = active && fresh && !hub.busy && hub.status == "Connected"
         primary.text = when (intent?.action) {
+            "SELECT_COFFEE" -> "Select Coffee (phone input)"
             "CAPTURE" -> "Capture text / receipt (phone input)"
-            "CONFIRM" -> "Confirm ${name(snapshot?.target)} ${snapshot?.amount.orEmpty()}"
+            "CONFIRM" -> if (snapshot?.interactionKind == "coffee") "Turn coffee ${if (snapshot.coffeeDesired) "on" else "off"}" else "Confirm ${name(snapshot?.target)} ${snapshot?.amount.orEmpty()}"
             else -> if (!hub.captureAvailable) "Capture workflow unavailable on this hub" else "Waiting for text / target"
         }
         primary.isEnabled = actionable && intent != null && !runtime.rawInputs && !runtime.gesture.held

@@ -30,7 +30,7 @@ class FoundationChecks(unittest.TestCase):
 
     def test_both_routes_assets_and_fixtures_are_served(self):
         with TestClient(create_app()) as client:
-            for route in ["/expense", "/json", "/text"]:
+            for route in ["/expense", "/json", "/text", "/coffee"]:
                 response = client.get(route)
                 self.assertEqual(response.status_code, 200, response.text)
                 self.assertIn('<div id="root">', response.text)
@@ -38,7 +38,7 @@ class FoundationChecks(unittest.TestCase):
             import re
             for asset in re.findall(r'(?:src|href)="(/assets/[^\"]+)"', index):
                 self.assertEqual(client.get(asset).status_code, 200, asset)
-            for marker_id in (10, 20, 30):
+            for marker_id in (10, 20, 30, 40):
                 response = client.get(f"/markers/aruco-{marker_id}.png")
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(response.headers["content-type"], "image/png")
@@ -50,7 +50,7 @@ class FoundationChecks(unittest.TestCase):
         targets = json.loads((ROOT / "contracts/targets.json").read_text())
         dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
         detector = cv2.aruco.ArucoDetector(dictionary)
-        for target_id, marker_id, route in [("expenses", 10, "/expense"), ("json", 20, "/json"), ("text", 30, "/text")]:
+        for target_id, marker_id, route in [("expenses", 10, "/expense"), ("json", 20, "/json"), ("text", 30, "/text"), ("coffee", 40, "/coffee")]:
             target = targets[target_id]
             self.assertEqual((target["route"], target["marker_id"], target["dictionary"]),
                              (route, marker_id, "DICT_4X4_50"))

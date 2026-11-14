@@ -4,7 +4,7 @@ This replaces the provisional protocol in the first planning report. It describe
 
 ## Scope
 
-- One wearer, one native phone app, one Python hub process, three receiving pages (Expenses, JSON and Text).
+- One wearer, one native phone app, one Python hub process, three receiving pages (Expenses, JSON and Text) and one simulated Coffee appliance page.
 - No database, auth framework, TLS certificates, general OS clipboard, third-party app injection, or background task queue service.
 - Plain HTTP/WS on a controlled private network using synthetic receipt data.
 - Query parameters identify routes/roles; they do not authenticate callers.
@@ -18,8 +18,9 @@ This replaces the provisional protocol in the first planning report. It describe
 | expenses | /expense | DICT_4X4_50 | 10 | Read-only expense draft |
 | json | /json | DICT_4X4_50 | 20 | Receipt JSON or raw text object |
 | text | /text | DICT_4X4_50 | 30 | Plain-text receiving page |
+| coffee | /coffee | DICT_4X4_50 | 40 | Simulated coffee machine |
 
-Generate the three marker PNGs with OpenCV. Do not style/crop their internal pattern. Put each in a large central tile with its destination name and a light outer margin. Put only one ID in each physical target tile.
+Generate the four marker PNGs with OpenCV. Do not style/crop their internal pattern. Put each in a large central tile with its destination name and a light outer margin. Put only one ID in each physical target tile.
 
 ## Identifiers: only those needed for the demo
 
@@ -63,6 +64,7 @@ Clients use one of:
 /v1/events?role=target&id=expenses
 /v1/events?role=target&id=json
 /v1/events?role=target&id=text
+/v1/events?role=target&id=coffee
 /v1/events?role=operator
 ```
 
@@ -96,7 +98,7 @@ All socket events contain `v:1`, `type`, and `run_id`.
 {"v":1,"type":"ACTION","run_id":"r1","action":"CONFIRM","preview_id":"p1"}
 ```
 
-Actions: START, CONFIRM, CANCEL, STOP, SEND_AGAIN, UNDO. Capture is the HTTP upload, not a second ACTION. START begins a new active interaction after STOPPED. SEND_AGAIN reuses the last validated capture after APPLIED and requires a new target preview/confirmation. The native button callback sends the action and preview_id shown when that button was rendered, not whichever action the app happens to consider current later.
+Actions: START, SELECT_COFFEE, CONFIRM, CANCEL, STOP, SEND_AGAIN, UNDO. Capture is the HTTP upload, not a second ACTION. START begins a new active interaction after STOPPED. SEND_AGAIN reuses the last validated content capture after APPLIED and requires a new target preview/confirmation. Coffee uses a fresh hold instead. The native button callback sends the action and preview_id shown when that button was rendered, not whichever action the app happens to consider current later.
 
 Operator Reset uses `{ "v": 1, "type": "RESET", "run_id": "r1" }`. This is the only operator mutation and must be an explicit button press. It clears the demo rather than acting as a recovery algorithm.
 
@@ -234,3 +236,56 @@ In explicit fixture mode, LOS_FIXTURE_CONTENT=receipt (default) returns
 fixtures/receipt_capture.json; LOS_FIXTURE_CONTENT=text returns
 fixtures/text_capture.json. Neither reads the pixels. Live mode ignores this
 fixture choice. Provider errors never fall back to either fixture.
+
+## Text analysis and Coffee extensions (issues #18 and #19)
+
+Android 0.4.0 adds these fields to the snapshot:
+
+| Field | Meaning |
+| --- | --- |
+| raw_text | Original transcription, unchanged after OCR. Null without content. |
+| text | Corrected text after successful analysis; otherwise the original. |
+| summary | Short AI summary for a text-only capture; null otherwise. |
+| text_status | raw, processing, ready, or unavailable. |
+| interaction_kind | content or coffee. |
+| coffee_on | Shared boolean appliance state, initially false. |
+| coffee_desired | Proposed on/off state during a coffee interaction, otherwise null. |
+| can_select_coffee | READY/APPLIED, active stream and fresh connected Coffee target. |
+
+After ContentReader returns no validated receipt, remain READING and set
+text_status=processing. A second request sends only raw_text to the same selected
+provider. It requests conservative grammar/OCR cleanup and a same-language
+summary. Preserve meaning, names, numbers, negation, URLs, code and uncertainty.
+Validate corrected text <=8000 characters, summary <=600, matching numeric and
+URL/email tokens and [unreadable] counts; summary cannot add numeric tokens.
+These checks do not guarantee semantic accuracy. Always expose the original.
+
+On success, set ready and enter HOLDING/PREVIEW. On analysis failure or its
+25-second timeout, keep the original text, no summary, and status unavailable;
+the user can still send it with a fallback label. Run/capture/phone/state guards
+apply after both requests. Cancel, Stop, Reset or disconnect prevents completion
+from reviving the capture. A validated receipt skips this pass entirely.
+
+This supersedes the text payload above: Text and text-only JSON drafts contain
+`{text, raw_text, summary, text_status}`. Valid receipt JSON remains the canonical
+ReceiptRecord. Text previews show a corrected/original label and short summary;
+the receiving page shows the full result and original as escaped text.
+
+Coffee uses the same deliberate gesture without OCR: when can_select_coffee is
+true, DOWN sends SELECT_COFFEE with a new capture_id UUID. The hub records this
+interaction ID, fixes coffee_desired to the opposite of coffee_on, and creates
+a Coffee preview. There is no JPEG upload or provider call. It can only confirm
+against a fresh Coffee target. A content hold aimed at Coffee is incompatible;
+release it before selecting Coffee. No target is a valid transient held state,
+but swiping without an actionable target cancels. UP before commit cancels.
+
+CONFIRM binds the exact preview once, saves the previous coffee boolean in the
+same single Undo slot used by drafts, sets coffee_on=coffee_desired and enters
+APPLIED. Text/receipt drafts are untouched. Duplicate confirms and release after
+apply cannot toggle again. A new hold/swipe proposes the opposite state. The
+Coffee page acknowledges the matching commit and animates only while on, with
+a reduced-motion static alternative. It is explicitly a simulation.
+
+Undo restores the last saved draft or coffee state once. Stop, mobile disconnect
+and receiver reconnect preserve the applied coffee state; explicit Reset and
+process restart turn it off. Coffee is not an entry in the drafts object.

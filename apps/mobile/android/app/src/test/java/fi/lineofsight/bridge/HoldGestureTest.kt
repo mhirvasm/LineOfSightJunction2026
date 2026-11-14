@@ -33,6 +33,16 @@ class HoldGestureTest {
         gesture.move(100f, 0f); gesture.move(200f, 0f); gesture.up()
         assertEquals(listOf("capture", "confirm:text-preview"), actions)
     }
+
+    @Test fun coffeeHoldNeedsSwipeAndReleaseAfterConfirmDoesNotToggleAgain() {
+        down()
+        gesture.update(snapshot("PREVIEW", "coffee-on").copy(target = "coffee", amount = "", interactionKind = "coffee", coffeeDesired = true))
+        assertEquals(listOf("capture"), actions)
+        gesture.move(100f, 0f)
+        gesture.update(snapshot("APPLIED").copy(interactionKind = "coffee", coffeeOn = true))
+        gesture.move(200f, 0f); gesture.up()
+        assertEquals(listOf("capture", "confirm:coffee-on"), actions)
+    }
     @Test fun readyMovementMustBeFreshAndSendOnce() {
         down(); gesture.move(200f, 0f); gesture.update(snapshot("PREVIEW", "p"))
         gesture.move(210f, 0f)

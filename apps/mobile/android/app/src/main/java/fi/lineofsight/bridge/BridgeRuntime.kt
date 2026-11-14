@@ -34,7 +34,7 @@ class BridgeRuntime private constructor(private val context: Context) {
         capture = {
             val id = UUID.randomUUID().toString()
             val intent = ActionPolicy.current(hub.snapshots.value, hub.captureAvailable)
-            if (intent?.action == "CAPTURE" && hub.perform(intent, frame, id)) id else null
+            if (intent?.action in setOf("CAPTURE", "SELECT_COFFEE") && intent != null && hub.perform(intent, frame, id)) id else null
         },
         cancel = { hub.cancelCapture(it) },
         confirm = { id, intent ->
@@ -81,15 +81,18 @@ class BridgeRuntime private constructor(private val context: Context) {
         val intent = ActionPolicy.current(s, hub.captureAvailable).takeIf {
             !rawInputs && !gesture.held && fresh && !hub.busy && hub.guard.active != null && hub.status == "Connected"
         }
-        val title = when (s?.state) {
-            "READING" -> "Reading text"
+        val title = if (s?.interactionKind == "coffee") {
+            if (s.state == "APPLIED") "Coffee ${if (s.coffeeOn) "on" else "off"}" else "Turn coffee ${if (s.coffeeDesired) "on" else "off"}"
+        } else when (s?.state) {
+            "READING" -> if (s.textStatus == "processing") "Improving text" else "Reading text"
             "PREVIEW" -> "${s.target?.replaceFirstChar { it.uppercase() }} ${if (s.target == "text" || s.amount.isBlank()) "${s.text?.length ?: 0} characters" else s.amount}"
             "HOLDING" -> if (s.amount.isBlank()) "Text held" else "Receipt held"
             "APPLIED" -> "Sent"
             else -> "Hold to capture"
         }
         val excerpt = s?.text?.takeIf { s.state in setOf("HOLDING", "PREVIEW") && (s.target == "text" || s.amount.isBlank()) }?.let { it.take(180) + if (it.length > 180) "..." else "" }
-        val body = listOfNotNull(excerpt, "${s?.receiptMode ?: "unknown"}: ${s?.feedback ?: "Connect and start"}").joinToString("\n")
+        val summary = s?.summary?.let { "Summary: " + it.take(160) + if (it.length > 160) "..." else "" }
+        val body = listOfNotNull(excerpt, summary, "${s?.receiptMode ?: "unknown"}: ${s?.feedback ?: "Connect and start"}").joinToString("\n")
         sdk.showCard(title, body, intent) {
             if (!rawInputs) hub.perform(it, frame)
         }
