@@ -23,7 +23,7 @@ class FoundationChecks(unittest.TestCase):
             self.assertEqual(first["v"], 1)
             self.assertIs(first["ok"], True)
             UUID(first["run_id"])
-            self.assertEqual(application.state.drafts, {"expenses": None, "json": None})
+            self.assertEqual(application.state.hub.drafts, {"expenses": None, "json": None})
         with TestClient(application) as client:
             self.assertNotEqual(first["run_id"], client.get("/health").json()["run_id"])
 
