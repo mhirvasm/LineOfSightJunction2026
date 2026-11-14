@@ -14,6 +14,11 @@ stream or replay that photo. Operator Reset clears the shared run and drafts.
 Glasses input, receipt extraction, confirmation/transfers, Send Again, and
 Undo are not implemented. No provider key is needed for these tests.
 
+**Next phase: iOS bridge, phone tests, then glasses.** The selected first native
+platform is iOS; Android is deferred. See the
+[development plan](docs/ios-phone-first-plan.md) for the menu-free interaction,
+ordered tasks, phone/mock acceptance checks, and later physical glasses gate.
+
 B1 was merged into `chore/k0-bootstrap` after the human tested it and
 explicitly requested the merge. B2 is on `feat/b2-target-selection` for
 review; it is not automatically merged.

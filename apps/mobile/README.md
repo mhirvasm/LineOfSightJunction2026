@@ -1,11 +1,13 @@
-# Native device work (A1 first)
+# Native device work (iOS, phone first)
 
-No native platform has been selected and no native integration exists yet.
-Available equipment: two Macs, a ThinkPad, an iPhone, and a Samsung Galaxy S23.
-Select one phone/platform with the Meta booth based on the loaned device's
-supported account, firmware, and official sample. Do not build both platforms.
+The selected first platform is iOS. No native integration exists yet. Android
+is deferred. Build the Swift bridge on a suitable Mac and test the SDK with
+MockDeviceKit, then stream an actual iPhone camera and use explicitly labelled
+phone controls before integrating physical glasses and the Neural Band.
 
-First prove changing live camera frames and ten deliberate supported
-display-button/Neural Band callbacks in the same session. Record camera,
-display, input, and simultaneous-operation results in `docs/device-check.md`.
-Only then begin A2 using the sample's actual SDK version and APIs.
+Follow the [phone-first development plan](../../docs/ios-phone-first-plan.md).
+Keep Expenses and JSON in scope and destination selection menu-free. Phone and
+mock checks do not pass the physical A1 gate. Before relying on glasses, prove
+changing camera frames, display, and ten deliberate supported band selections
+together, then record the actual hardware/SDK/OS/build results in
+`docs/device-check.md`. Use the installed SDK's documented APIs.

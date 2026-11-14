@@ -11,7 +11,7 @@ Estimated working time when bootstrap began: 16-20 hours, allowing for sleep.
 | Glasses / band access | Not yet available when bootstrap began |
 | Available computers | Two Macs, Lenovo ThinkPad |
 | Available phones | iPhone, Samsung Galaxy S23 |
-| Selected native platform | Undecided; confirm with booth |
+| Selected native platform | iOS first; phone/mock tests before glasses; Android deferred |
 | Next hardware slot | To be confirmed with booth |
 | Hub IP / private network | Not tested / to be recorded |
 | Phone-browser health check | NOT TESTED |
@@ -23,6 +23,11 @@ Estimated working time when bootstrap began: 16-20 hours, allowing for sleep.
 | Remove/re-wear and resume | NOT TESTED |
 | SDK / firmware / phone OS / build command | Record actual values after test |
 | Known-good hardware build / commit | None yet |
+
+The selected development sequence is recorded in the
+[iOS phone-first plan](ios-phone-first-plan.md). The platform decision does not
+change any untested hardware result above. Mock SDK and physical iPhone camera
+results must be recorded separately from real glasses/band results.
 
 Start by asking Amanda/the Meta booth which paired phone, account, firmware,
 and official sample work with the loaned Display glasses and Neural Band.
