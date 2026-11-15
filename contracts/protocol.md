@@ -4,7 +4,7 @@ This replaces the provisional protocol in the first planning report. It describe
 
 ## Scope
 
-- One wearer, one native phone app, one Python hub process, two receiving pages.
+- One wearer, one native phone app, one Python hub process, three receiving pages (Expenses, JSON and Text) and one simulated Coffee appliance page.
 - No database, auth framework, TLS certificates, general OS clipboard, third-party app injection, or background task queue service.
 - Plain HTTP/WS on a controlled private network using synthetic receipt data.
 - Query parameters identify routes/roles; they do not authenticate callers.
@@ -16,15 +16,17 @@ This replaces the provisional protocol in the first planning report. It describe
 | target_id | Route | ArUco dictionary | Marker ID | Adapter |
 | --- | --- | --- | --- | --- |
 | expenses | /expense | DICT_4X4_50 | 10 | Read-only expense draft |
-| json | /json | DICT_4X4_50 | 20 | Plain-text JSON viewer |
+| json | /json | DICT_4X4_50 | 20 | Receipt JSON or raw text object |
+| text | /text | DICT_4X4_50 | 30 | Plain-text receiving page |
+| coffee | /coffee | DICT_4X4_50 | 40 | Simulated coffee machine |
 
-Generate the two marker PNGs with OpenCV. Do not style/crop their internal pattern. Put each in a large central tile with its destination name and a light outer margin. Do not put both IDs in the same physical target tile.
+Generate the four marker PNGs with OpenCV. Do not style/crop their internal pattern. Put each in a large central tile with its destination name and a light outer margin. Put only one ID in each physical target tile.
 
 ## Identifiers: only those needed for the demo
 
 - `run_id`: random hub-issued UUID at process start or explicit Reset. All requests after connection carry it. A mismatched value is rejected without mutation.
 - `stream_id`: random phone-issued UUID when a camera stream starts. `frame_seq` increases within that stream. The hub binds the currently active stream to the active mobile connection; it rejects previous-stream uploads after a replacement is established.
-- `capture_id`: phone-issued UUID for one frozen receipt image. Duplicate upload of the same capture_id must not invoke the model again. Never reuse it for a different image.
+- `capture_id`: phone-issued UUID for one frozen image. Duplicate upload of the same capture_id must not invoke the model again. Never reuse it for a different image.
 - `preview_id`: hub-issued UUID that binds the current capture, selected target, and validated record. It does not change for repeated observations of the same unchanged target.
 - `commit_id`: exactly the preview_id being confirmed. Use a set of applied commit IDs to deduplicate within this run. No cross-restart guarantee.
 
@@ -45,7 +47,7 @@ Keep capture/commit deduplication records for the demo run. If a small cap such 
 
 `merchant` and `date` may be null during review, but both must be valid for confirmation. `currency` must be EUR; `total_minor` must be a nonnegative integer, not a boolean or silently truncated float. A missing tax value is null and is NOT a blocking review reason. `needs_review` lists ambiguous/missing required fields. There is no correction editor in scope: recapture instead. Display the amount before confirmation; schema validity does not prove the model read it correctly.
 
-Only the extraction module produces this record; it never chooses a target or invokes an action. Escape receipt strings in the UI. Do not execute generated code/SQL. Use the same canonical fields for both destinations.
+Only the extraction module produces this record; it never chooses a target or invokes an action. Escape all extracted strings in the UI. Do not execute generated code/SQL. Use the same canonical receipt fields for Expenses and receipt JSON.
 
 ## Endpoints
 
@@ -61,6 +63,8 @@ Clients use one of:
 /v1/events?role=mobile
 /v1/events?role=target&id=expenses
 /v1/events?role=target&id=json
+/v1/events?role=target&id=text
+/v1/events?role=target&id=coffee
 /v1/events?role=operator
 ```
 
@@ -80,7 +84,7 @@ Vision runs in bounded background work. Results carry stream_id and frame_seq; s
 
 ### POST /v1/captures
 
-Multipart fields: `run_id`, `capture_id`, `age_ms`, and `image` (JPEG bytes). The phone freezes/copies the exact frame at the Capture callback, before any async upload. Capture is allowed only in READY. Limit concurrent extraction to one. Apply the same bounded size/decode checks as frames.
+Multipart fields: `run_id`, `capture_id`, `age_ms`, and `image` (JPEG bytes). The phone freezes/copies the exact frame at the Capture callback, before any async upload. Capture is allowed in READY or APPLIED. A fresh grab preserves all drafts and the Undo slot until another successful apply. Limit concurrent extraction to one. Apply the same bounded size/decode checks as frames.
 
 Store the capture_id as accepted BEFORE starting extraction. A duplicate upload returns accepted/current status without another model call; a different capture_id while READING returns busy. Reject a reused capture_id with different image bytes. Return a clear response such as `{ "accepted": true, "capture_id": "..." }`; completion arrives in SNAPSHOT.
 
@@ -94,7 +98,7 @@ All socket events contain `v:1`, `type`, and `run_id`.
 {"v":1,"type":"ACTION","run_id":"r1","action":"CONFIRM","preview_id":"p1"}
 ```
 
-Actions: START, CONFIRM, CANCEL, STOP, SEND_AGAIN, UNDO. Capture is the HTTP upload, not a second ACTION. START begins a new active interaction after STOPPED. SEND_AGAIN reuses the last validated receipt after APPLIED and requires a new target preview/confirmation. The native button callback sends the action and preview_id shown when that button was rendered, not whichever action the app happens to consider current later.
+Actions: START, SELECT_COFFEE, CONFIRM, CANCEL, STOP, SEND_AGAIN, UNDO. Capture is the HTTP upload, not a second ACTION. START begins a new active interaction after STOPPED. SEND_AGAIN reuses the last validated content capture after APPLIED and requires a new target preview/confirmation. Coffee uses a fresh hold instead. The native button callback sends the action and preview_id shown when that button was rendered, not whichever action the app happens to consider current later.
 
 Operator Reset uses `{ "v": 1, "type": "RESET", "run_id": "r1" }`. This is the only operator mutation and must be an explicit button press. It clears the demo rather than acting as a recovery algorithm.
 
@@ -124,11 +128,12 @@ Accept DISPLAYED only from that target's current socket and only for the matchin
   "state": "PREVIEW",
   "source_mode": "live",
   "capture_id": "c1",
+  "text": "DEMO CAFE\nTOTAL: EUR 24.80",
   "receipt": {"merchant":"Demo Cafe","date":"2026-11-14","total_minor":2480,"currency":"EUR","tax_minor":null,"needs_review":[]},
   "target_id": "expenses",
   "preview_id": "p1",
   "can_confirm": true,
-  "drafts": {"expenses": null, "json": null},
+  "drafts": {"expenses": null, "json": null, "text": null},
   "last_commit": null,
   "feedback": "Expenses / EUR 24.80 / Confirm",
   "error": null
@@ -146,9 +151,9 @@ Accept DISPLAYED only from that target's current socket and only for the matchin
 | READING | CANCEL/STOP; ignore new captures and confirms. |
 | HOLDING | Select a connected target using fresh vision; CANCEL/STOP. |
 | PREVIEW | CONFIRM for exact preview_id, CANCEL/STOP. Loss/change of target invalidates preview. |
-| APPLIED | SEND_AGAIN, UNDO, CANCEL/STOP. A repeated old CONFIRM is a no-op. |
+| APPLIED | New capture, SEND_AGAIN, UNDO, CANCEL/STOP. A repeated old CONFIRM is a no-op. |
 
-Extraction success enters HOLDING only if run_id/capture_id are still active. Failure or invalid required fields returns READY with a recapture message. CANCEL invalidates the receipt/preview and returns READY during an active camera session; STOP enters STOPPED. Neither reverses an applied draft. A new START clears the active receipt/preview but does not erase either destination's previous draft.
+Extraction success enters HOLDING only if run_id/capture_id are still active. Extraction failure, empty text or oversized text returns READY with a recapture message. Invalid receipt fields disable Expenses but do not block a readable transcription. CANCEL invalidates the text/receipt/preview and returns READY during an active camera session; STOP enters STOPPED. Neither reverses an applied draft. A new START clears the active text/receipt/preview but does not erase any destination's previous draft.
 
 Target acquisition starts around 350 ms stable observation in a central region; expire around 600 ms after the last usable observation. Reject ambiguous/unknown targets. A fresh observation is needed at CONFIRM. These are adjustable starting points. There is no eye tracking, secure physical-device recognition, or guarantee of zero false selections.
 
@@ -158,12 +163,12 @@ The hub is the only writer. CONFIRM first checks the current run. If its preview
 
 1. Recheck that commit_id has not already been applied if a lock was needed between earlier validation and mutation.
 2. Deep-copy the selected draft into one global previous-draft slot with its target ID.
-3. Replace only that target's draft with a copy of the canonical record.
+3. Replace only that target's draft with a copy of the selected destination payload (defined below).
 4. Record commit_id, invalidate the actionable preview, enter APPLIED.
 
-Broadcast afterward. Feedback starts as `Sent; waiting for screen`. After a matching DISPLAYED, say `Shown on Expenses/JSON`. After a short timeout or target disconnect, say `Draft updated; screen not confirmed`. Do not retry the mutation. Reconnecting targets receive the current snapshot and may acknowledge it.
+Broadcast afterward. Feedback starts as `Sent; waiting for screen`. After a matching DISPLAYED, say `Shown on Expenses/JSON/Text`. After a short timeout or target disconnect, say `Draft updated; screen not confirmed`. Do not retry the mutation. Reconnecting targets receive the current snapshot and may acknowledge it.
 
-UNDO restores the previous-draft slot once, clears that slot, invalidates the current preview/last-commit feedback, and returns to HOLDING if a receipt remains (otherwise READY/STOPPED as appropriate). There is no manual form editing and no conflict resolution. SEND_AGAIN creates a new preview_id even for the same target. It must never reuse the prior commit_id.
+UNDO is available in READY/APPLIED. It restores the previous-draft slot once, clears that slot, invalidates the current capture/preview/last-commit feedback, and returns to READY. There is no manual form editing and no conflict resolution. SEND_AGAIN creates a new preview_id even for the same target. It must never reuse the prior commit_id.
 
 Duplicate checks, draft mutation, and state transition run in one event-loop turn or under one hub lock. Do not await image/model work while holding that lock. Run one server worker. Keep slow work outside the event loop; completion returns tagged data to the workflow.
 
@@ -173,4 +178,114 @@ Wrong frame at capture; duplicate confirmation; stale target preview; repeated u
 
 ## Privacy/demo constraints
 
-Use synthetic receipts and a consenting wearer. Do not log camera images or provider keys. Release active image buffers after extraction/cancel/stop. Cloud extraction sends the selected image to the configured provider; make that boundary clear. Final receipt data remains in demo memory until Reset/restart. No public deployment claim is made.
+Use synthetic receipts and a consenting wearer. Do not log camera images or provider keys. Release active image buffers after extraction/cancel/stop. Cloud extraction sends the selected image to the configured provider; make that boundary clear. Final extracted text and receipt data remain in demo memory until Reset/restart. No public deployment claim is made.
+
+
+## Hold/drag build clarification (issues #8-#12)
+
+CANCEL carries capture_id. It records a cancellation even if that capture upload
+has not arrived yet. A cancel for an old capture cannot cancel a newer one. A
+release after APPLIED never undoes a draft. Clients include capture_id with
+CONFIRM to let a failed freshness check cancel only that same interaction.
+Capture cancellation records and image digests remain bounded for the run; images
+do not. Only accepted capture IDs invoke extraction, at most once.
+
+The band mapping is DOWN -> freeze, fresh rightward MOVE after HOLDING/PREVIEW ->
+confirm exact preview (or CANCEL if no destination), UP before commit -> CANCEL.
+Rebase displacement on readiness or preview/target change. Pre-ready movement is
+never queued. Ignore movement after send/cancel until release. No target while
+looking between screens is allowed; an attempted paste without a target cancels.
+
+Snapshots add extraction_provider (gemini/openai). source_mode remains fixture/live.
+LOS_EXTRACTION_MODE explicitly selects the mode; LOS_EXTRACTION_PROVIDER selects
+one provider. There is no provider or fixture fallback. scripts/run_hub.py loads
+only recognized keys from ignored .env without printing them.
+
+
+## Raw text extension (issue #16)
+
+The frozen JPEG is read once by ContentReader. Its result is
+`{"text": "literal transcription", "receipt": null}` or the same object with a
+validated ReceiptRecord. Text must be nonblank and at most 8000 characters.
+Preserve original wording, language and punctuation; use one newline between
+visible lines. Uncertain words are marked `[unreadable]`; no translation,
+summarization, spelling correction or execution of image instructions is requested.
+Model output still needs human review. Whole visible blocks are supported, not
+individual word selection. Handwriting accuracy is pending physical checks.
+
+Snapshots add `text` (null until extraction finishes). Receipt fields remain
+unchanged for existing clients. No phone content-mode menu is needed:
+
+| Destination | Accepted payload | Result |
+| --- | --- | --- |
+| Text | Any validated transcription | Draft becomes `{"text": "..."}`; render as selectable literal text. |
+| JSON | Any validated capture | Existing ReceiptRecord when valid, otherwise `{"text": "..."}`. |
+| Expenses | Valid EUR ReceiptRecord | Existing expense fields. A note stays HOLDING with no actionable preview. |
+
+The preview binds the chosen destination to its payload. A paste gesture with an
+incompatible destination cancels just like a paste with no destination. No draft
+changes before confirmation. The Text page replaces its prior text once; Undo
+restores that previous value. Sending does not write the system clipboard or type
+into another application's window. Rendering uses escaped text, never HTML.
+
+Use Android 0.3.0 for the transcription preview and Text target label. The glasses
+HUD uses the same snapshot and a short excerpt; hardware rendering remains
+unverified. The receiver displays the full text, with scrolling for longer blocks.
+
+In explicit fixture mode, LOS_FIXTURE_CONTENT=receipt (default) returns
+fixtures/receipt_capture.json; LOS_FIXTURE_CONTENT=text returns
+fixtures/text_capture.json. Neither reads the pixels. Live mode ignores this
+fixture choice. Provider errors never fall back to either fixture.
+
+## Text analysis and Coffee extensions (issues #18 and #19)
+
+Android 0.4.0 adds these fields to the snapshot:
+
+| Field | Meaning |
+| --- | --- |
+| raw_text | Original transcription, unchanged after OCR. Null without content. |
+| text | Corrected text after successful analysis; otherwise the original. |
+| summary | Short AI summary for a text-only capture; null otherwise. |
+| text_status | raw, processing, ready, or unavailable. |
+| interaction_kind | content or coffee. |
+| coffee_on | Shared boolean appliance state, initially false. |
+| coffee_desired | Proposed on/off state during a coffee interaction, otherwise null. |
+| can_select_coffee | READY/APPLIED, active stream and fresh connected Coffee target. |
+
+After ContentReader returns no validated receipt, remain READING and set
+text_status=processing. A second request sends only raw_text to the same selected
+provider. It requests conservative grammar/OCR cleanup and a same-language
+summary. Preserve meaning, names, numbers, negation, URLs, code and uncertainty.
+Validate corrected text <=8000 characters, summary <=600, matching numeric and
+URL/email tokens and [unreadable] counts; summary cannot add numeric tokens.
+These checks do not guarantee semantic accuracy. Always expose the original.
+
+On success, set ready and enter HOLDING/PREVIEW. On analysis failure or its
+25-second timeout, keep the original text, no summary, and status unavailable;
+the user can still send it with a fallback label. Run/capture/phone/state guards
+apply after both requests. Cancel, Stop, Reset or disconnect prevents completion
+from reviving the capture. A validated receipt skips this pass entirely.
+
+This supersedes the text payload above: Text and text-only JSON drafts contain
+`{text, raw_text, summary, text_status}`. Valid receipt JSON remains the canonical
+ReceiptRecord. Text previews show a corrected/original label and short summary;
+the receiving page shows the full result and original as escaped text.
+
+Coffee uses the same deliberate gesture without OCR: when can_select_coffee is
+true, DOWN sends SELECT_COFFEE with a new capture_id UUID. The hub records this
+interaction ID, fixes coffee_desired to the opposite of coffee_on, and creates
+a Coffee preview. There is no JPEG upload or provider call. It can only confirm
+against a fresh Coffee target. A content hold aimed at Coffee is incompatible;
+release it before selecting Coffee. No target is a valid transient held state,
+but swiping without an actionable target cancels. UP before commit cancels.
+
+CONFIRM binds the exact preview once, saves the previous coffee boolean in the
+same single Undo slot used by drafts, sets coffee_on=coffee_desired and enters
+APPLIED. Text/receipt drafts are untouched. Duplicate confirms and release after
+apply cannot toggle again. A new hold/swipe proposes the opposite state. The
+Coffee page acknowledges the matching commit and animates only while on, with
+a reduced-motion static alternative. It is explicitly a simulation.
+
+Undo restores the last saved draft or coffee state once. Stop, mobile disconnect
+and receiver reconnect preserve the applied coffee state; explicit Reset and
+process restart turn it off. Coffee is not an entry in the drafts object.

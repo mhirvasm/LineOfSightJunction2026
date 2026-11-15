@@ -7,7 +7,7 @@ import numpy as np
 
 MAX_BYTES = 2_000_000
 MAX_PIXELS = 4_000_000
-TARGETS = {10: "expenses", 20: "json"}
+TARGETS = {10: "expenses", 20: "json", 30: "text", 40: "coffee"}
 
 
 class ImageTooLarge(ValueError):
@@ -88,5 +88,5 @@ class MarkerDetector:
             return Detection(None, "Marker is outside the central half of the image. Aim at the middle of one screen.", found)
         marker_id = central[0]
         if marker_id not in TARGETS:
-            return Detection(None, f"Unknown central marker {marker_id}; only 10 and 20 are registered.", found, True)
+            return Detection(None, f"Unknown central marker {marker_id}; only 10, 20, 30 and 40 are registered.", found, True)
         return Detection(TARGETS[marker_id], f"Recognized marker {marker_id}: {TARGETS[marker_id]}.", found)

@@ -26,7 +26,7 @@ async function jpegFromPhoto(file) {
 
 export function VisionStatus({ snapshot }) {
   const vision = snapshot?.vision;
-  const name = (value) => value === 'expenses' ? 'Expenses' : value === 'json' ? 'JSON' : 'None';
+  const name = (value) => value === 'expenses' ? 'Expenses' : value === 'json' ? 'JSON' : value === 'text' ? 'Text' : value === 'coffee' ? 'Coffee' : 'None';
   return <section className="card vision-panel" aria-label="Marker recognition"><h2>Marker recognition</h2>
     <dl className="receipt-fields"><div><dt>Last image recognized</dt><dd>{name(vision?.detected_target_id)}</dd></div><div><dt>Fresh candidate</dt><dd>{name(vision?.candidate_id)}</dd></div><div><dt>Stable target</dt><dd>{name(vision?.locked_target_id)}</dd></div></dl>
     <p role="status">{vision?.message ?? 'Waiting for the camera-test connection.'}</p>

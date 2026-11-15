@@ -34,7 +34,7 @@ class HubChecks(unittest.TestCase):
                 "/v1/events?role=mobile", "/v1/events?role=operator",
             ]]
             complete = lambda value: value["connections"] == {
-                "mobile": True, "targets": {"expenses": True, "json": True}, "operators": 1}
+                "mobile": True, "targets": {"expenses": True, "json": True, "text": False, "coffee": False}, "operators": 1}
             initial = [snapshot(socket, complete) for socket in sockets]
             run_id = client.get("/health").json()["run_id"]
             self.assertEqual({item["run_id"] for item in initial}, {run_id})
@@ -46,7 +46,7 @@ class HubChecks(unittest.TestCase):
             sockets[-1].send_json({"v": 1, "type": "RESET", "run_id": run_id})
             refreshed = [snapshot(socket, lambda value: value["run_id"] != run_id) for socket in sockets]
             self.assertEqual(len({item["run_id"] for item in refreshed}), 1)
-            self.assertEqual(refreshed[0]["drafts"], {"expenses": None, "json": None})
+            self.assertEqual(refreshed[0]["drafts"], {"expenses": None, "json": None, "text": None})
             self.assertEqual(hub.capture_records, {})
             self.assertEqual(hub.applied_commit_ids, set())
             self.assertIsNone(hub.active_stream_id)
@@ -84,7 +84,7 @@ class HubChecks(unittest.TestCase):
                 bad = [({"v": 1, "type": "RESET", "run_id": "old-run"}, "stale_run"),
                        ({"v": True, "type": "RESET", "run_id": initial["run_id"]}, "invalid_event"),
                        ({"v": 1, "type": [], "run_id": initial["run_id"]}, "invalid_event"),
-                       ({"v": 1, "type": "ACTION", "action": "CONFIRM", "run_id": initial["run_id"]}, "not_implemented")]
+                       ({"v": 1, "type": "ACTION", "action": "CONFIRM", "run_id": initial["run_id"]}, "forbidden")]
                 for event, code in bad:
                     operator.send_json(event)
                     self.assertEqual(operator.receive_json()["error"], code)

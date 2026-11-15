@@ -1,11 +1,11 @@
-# Native device work (A1 first)
+# Native bridges
 
-No native platform has been selected and no native integration exists yet.
-Available equipment: two Macs, a ThinkPad, an iPhone, and a Samsung Galaxy S23.
-Select one phone/platform with the Meta booth based on the loaned device's
-supported account, firmware, and official sample. Do not build both platforms.
+The human selected iOS first and then explicitly requested a separate Android
+implementation. This branch contains the [Android phone-first bridge](android/README.md).
+iOS planning/implementation stays on its own branch; no iOS code is added here.
 
-First prove changing live camera frames and ten deliberate supported
-display-button/Neural Band callbacks in the same session. Record camera,
-display, input, and simultaneous-operation results in `docs/device-check.md`.
-Only then begin A2 using the sample's actual SDK version and APIs.
+Test the phone camera and simulated selection path before using glasses. Keep
+Expenses and JSON and menu-free destination selection. Phone/mock success does
+not pass A1: real camera, display, and ten deliberate supported band actions
+must work together on the actual loaned hardware. Record actual SDK/runtime,
+phone OS, build command, and physical results separately.

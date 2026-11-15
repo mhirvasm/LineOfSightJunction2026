@@ -24,6 +24,13 @@ Estimated working time when bootstrap began: 16-20 hours, allowing for sleep.
 | SDK / firmware / phone OS / build command | Record actual values after test |
 | Known-good hardware build / commit | None yet |
 
+Android bridge follow-up (14 November 2026): the separately requested
+`feat/android-sdk-bridge` task uses DAT 1.0.1. Its debug APK, nine native JVM
+tests, and lint pass. Actual phone-camera and glasses/band checks remain
+pending; the S23 did not enumerate in Windows/ADB during the first USB attempt.
+See [task #6](tasks/A2-A3-android-sdk-bridge.md) for software evidence and the
+phone test runbook. iOS planning remains separate.
+
 Start by asking Amanda/the Meta booth which paired phone, account, firmware,
 and official sample work with the loaned Display glasses and Neural Band.
 Use that sample's documented APIs. Prove changing upright live frames and

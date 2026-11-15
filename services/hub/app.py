@@ -27,6 +27,7 @@ async def lifespan(application: FastAPI):
         yield
     finally:
         await vision.close()
+        await application.state.hub.workflow.close()
 
 
 def create_app() -> FastAPI:
@@ -34,7 +35,7 @@ def create_app() -> FastAPI:
 
     @application.middleware("http")
     async def reject_large_frame_body(request, call_next):
-        if request.url.path == "/v1/frames":
+        if request.url.path in {"/v1/frames", "/v1/captures"}:
             length = request.headers.get("content-length")
             if length and (not length.isdigit() or int(length) > MAX_BYTES + 64_000):
                 return JSONResponse({"detail": "Frame request is too large or has an invalid length."}, status_code=413)
@@ -71,6 +72,31 @@ def create_app() -> FastAPI:
             except ValueError as error:
                 raise HTTPException(400, str(error))
             return {"accepted": True, "stream_id": form["stream_id"], "frame_seq": sequence}
+
+    @application.post("/v1/captures", status_code=202)
+    async def captures(request: Request):
+        hub = application.state.hub
+        owner = hub.clients.get("mobile")
+        async with request.form(max_files=1, max_fields=3, max_part_size=1024) as form:
+            if set(form) != {"run_id", "capture_id", "age_ms", "image"} or len(list(form.multi_items())) != 4:
+                raise HTTPException(400, "Send run_id, capture_id, age_ms, image exactly once.")
+            if not isinstance(form["image"], UploadFile):
+                raise HTTPException(400, "image must be a JPEG file part.")
+            try:
+                if not all(isinstance(form[k], str) for k in ("run_id", "capture_id", "age_ms")):
+                    raise ValueError("Invalid capture metadata.")
+                age = int(form["age_ms"])
+                data = await form["image"].read(MAX_BYTES + 1)
+                validate_jpeg(data)
+                hub.workflow.accept(form["run_id"], form["capture_id"], age, data, owner)
+            except FrameRejected as error:
+                raise HTTPException(error.status, str(error))
+            except ImageTooLarge as error:
+                raise HTTPException(413, str(error))
+            except (ValueError, TypeError) as error:
+                raise HTTPException(422, str(error))
+        await hub.broadcast()
+        return {"accepted": True, "capture_id": form["capture_id"]}
 
     @application.websocket("/v1/events")
     async def events(socket: WebSocket):
@@ -112,6 +138,8 @@ def create_app() -> FastAPI:
 
     @application.get("/expense", include_in_schema=False)
     @application.get("/json", include_in_schema=False)
+    @application.get("/text", include_in_schema=False)
+    @application.get("/coffee", include_in_schema=False)
     @application.get("/operator", include_in_schema=False)
     @application.get("/fixture-mobile", include_in_schema=False)
     async def target_page():

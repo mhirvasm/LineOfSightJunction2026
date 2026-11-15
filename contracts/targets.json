@@ -12,5 +12,19 @@
     "dictionary": "DICT_4X4_50",
     "marker_id": 20,
     "marker_asset": "/markers/aruco-20.png"
+  },
+  "text": {
+    "label": "Text",
+    "route": "/text",
+    "dictionary": "DICT_4X4_50",
+    "marker_id": 30,
+    "marker_asset": "/markers/aruco-30.png"
+  },
+  "coffee": {
+    "label": "Coffee",
+    "route": "/coffee",
+    "dictionary": "DICT_4X4_50",
+    "marker_id": 40,
+    "marker_asset": "/markers/aruco-40.png"
   }
 }

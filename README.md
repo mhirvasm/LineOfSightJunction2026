@@ -1,5 +1,32 @@
 # LineOfSight
 
+## Current demo: text summaries, receipts and Coffee
+
+Use Android 0.4.0 with the hub on the same network. Hold to capture text or a
+receipt, face a registered destination, and drag right to paste; release cancels.
+Open `/text` (marker 30) for corrected text, summary and original transcription,
+`/expense` (10) for a validated EUR
+receipt, or `/json` (20) for receipt fields or a text object. The destination
+selects the output; no content-mode menu is needed. Text is pasted into the
+receiving webpage. General OS clipboard and third-party app insertion are not
+implemented. Text-only captures get a second AI pass; receipts bypass it. If the
+second pass fails, the original text remains available with a clear label.
+
+Open `/coffee` (marker 40) for the simulated coffee machine. Aim there before
+holding, then swipe right to start brewing; a fresh hold/swipe stops it. Release
+before swiping cancels. Looking alone does not toggle it. No image extraction or
+real appliance connection is involved. Physical phone checks for this build,
+handwriting and glasses checks are still pending.
+
+Start the configured hub with `.venv/Scripts/python.exe scripts/run_hub.py` on
+Windows, or `python scripts/run_hub.py` in the activated Mac environment. Copy
+`.env.example` to the ignored `.env` and configure live mode/provider locally.
+Never commit keys. Build web changes with `npm --prefix apps/web run build`.
+
+See [text analysis and Coffee build](docs/tasks/text-analysis-coffee-demo.md) for exact checks,
+startup commands and the prior verified build. Earlier sections below record the
+foundation and original receipt-only setup; the current protocol takes precedence.
+
 Junction prototype: capture a synthetic receipt through Meta Ray-Ban Display
 glasses, look toward Expenses or JSON, preview the amount, and deliberately
 confirm a transfer with a supported Neural Band/display action.
@@ -13,6 +40,13 @@ can take or choose one photo to check recognition. It does not automatically
 stream or replay that photo. Operator Reset clears the shared run and drafts.
 Glasses input, receipt extraction, confirmation/transfers, Send Again, and
 Undo are not implemented. No provider key is needed for these tests.
+
+**Android bridge on this branch:** the native
+[phone-first Android app](apps/mobile/android/README.md) adds continuous handset
+camera streaming through Meta's mock SDK, shared marker status, and an SDK
+selection diagnostic. Receipt actions remain disabled against the current B2
+hub. Its physical phone/glasses checks are tracked separately in
+[issue #6](https://github.com/mhirvasm/LineOfSightJunction2026/issues/6).
 
 B1 was merged into `chore/k0-bootstrap` after the human tested it and
 explicitly requested the merge. B2 is on `feat/b2-target-selection` for

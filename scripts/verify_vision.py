@@ -50,6 +50,8 @@ class PixelChecks(unittest.TestCase):
         detect = MarkerDetector()
         self.assertEqual(detect(camera_frame()).target_id, "expenses")
         self.assertEqual(detect(camera_frame(((20, 360, 240),))).target_id, "json")
+        self.assertEqual(detect(camera_frame(((30, 360, 240),))).target_id, "text")
+        self.assertEqual(detect(camera_frame(((40, 360, 240),))).target_id, "coffee")
         self.assertIsNone(detect(camera_frame(((10, 10, 240),))).target_id)
         self.assertTrue(detect(camera_frame(((7, 360, 240),))).unsafe)
         ambiguous = detect(camera_frame(((10, 200, 240), (20, 540, 240))))
@@ -125,7 +127,7 @@ class UploadChecks(unittest.TestCase):
             phone.send_json({"v": 1, "type": "ACTION", "action": "STOP", "run_id": fields["run_id"]})
             stopped = snapshot(phone, lambda value: value["state"] == "STOPPED")
             self.assertIsNone(stopped["target_id"])
-            self.assertEqual(stopped["drafts"], {"expenses": None, "json": None})
+            self.assertEqual(stopped["drafts"], {"expenses": None, "json": None, "text": None})
             response = client.post("/v1/frames", data=fields | {"frame_seq": "2"}, files={"image": ("frame.jpg", jpeg, "image/jpeg")})
             self.assertEqual(response.status_code, 409)
 
@@ -145,7 +147,7 @@ class UploadChecks(unittest.TestCase):
             self.assertFalse(locked["can_confirm"])
             expired = snapshot(phone, lambda value: "expired" in value["vision"]["message"])
             self.assertIsNone(expired["target_id"])
-            self.assertEqual(expired["drafts"], {"expenses": None, "json": None})
+            self.assertEqual(expired["drafts"], {"expenses": None, "json": None, "text": None})
 
     def test_disconnected_receiving_screen_is_recognized_but_not_selected(self):
         with TestClient(create_app()) as client, ExitStack() as stack:
@@ -218,7 +220,7 @@ class WorkerChecks(unittest.IsolatedAsyncioTestCase):
         await asyncio.wait_for(service.worker, 2)
         self.assertEqual(service.detected_id, "json")
         self.assertIsNone(hub.target_id)
-        self.assertEqual(hub.drafts, {"expenses": None, "json": None})
+        self.assertEqual(hub.drafts, {"expenses": None, "json": None, "text": None})
 
     async def test_unchanged_selection_keeps_preview_id_and_screen_loss_clears_it(self):
         hub, owner, service = await self.make_service(lambda data: Detection("expenses", "Recognized."))

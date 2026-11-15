@@ -7,12 +7,17 @@
     "source_mode": "fixture",
     "capture_id": null,
     "receipt": null,
+    "text": null,
+    "raw_text": null,
+    "summary": null,
+    "text_status": "raw",
     "target_id": null,
     "preview_id": null,
     "can_confirm": false,
     "drafts": {
       "expenses": null,
-      "json": null
+      "json": null,
+      "text": null
     },
     "last_commit": null,
     "feedback": "Fixture example: stopped. Start is not connected yet.",
@@ -26,12 +31,17 @@
     "source_mode": "fixture",
     "capture_id": null,
     "receipt": null,
+    "text": null,
+    "raw_text": null,
+    "summary": null,
+    "text_status": "raw",
     "target_id": null,
     "preview_id": null,
     "can_confirm": false,
     "drafts": {
       "expenses": null,
-      "json": null
+      "json": null,
+      "text": null
     },
     "last_commit": null,
     "feedback": "Ready to capture a receipt.",
@@ -45,12 +55,17 @@
     "source_mode": "fixture",
     "capture_id": "00000000-0000-4000-8000-000000000002",
     "receipt": null,
+    "text": null,
+    "raw_text": null,
+    "summary": null,
+    "text_status": "raw",
     "target_id": null,
     "preview_id": null,
     "can_confirm": false,
     "drafts": {
       "expenses": null,
-      "json": null
+      "json": null,
+      "text": null
     },
     "last_commit": null,
     "feedback": "Reading the frozen receipt image.",
@@ -71,12 +86,17 @@
       "tax_minor": null,
       "needs_review": []
     },
+    "text": "DEMO CAFE\nReceipt\nDate: 2026-11-14\nCoffee and lunch\nTOTAL: EUR 24.80\nThank you",
+    "raw_text": null,
+    "summary": null,
+    "text_status": "raw",
     "target_id": null,
     "preview_id": null,
     "can_confirm": false,
     "drafts": {
       "expenses": null,
-      "json": null
+      "json": null,
+      "text": null
     },
     "last_commit": null,
     "feedback": "Receipt ready. Look toward a destination.",
@@ -97,12 +117,17 @@
       "tax_minor": null,
       "needs_review": []
     },
+    "text": "DEMO CAFE\nReceipt\nDate: 2026-11-14\nCoffee and lunch\nTOTAL: EUR 24.80\nThank you",
+    "raw_text": null,
+    "summary": null,
+    "text_status": "raw",
     "target_id": "expenses",
     "preview_id": "00000000-0000-4000-8000-000000000010",
     "can_confirm": true,
     "drafts": {
       "expenses": null,
-      "json": null
+      "json": null,
+      "text": null
     },
     "last_commit": null,
     "feedback": "Expenses / EUR 24.80 / Confirm (fixture example only)",
@@ -123,15 +148,77 @@
       "tax_minor": null,
       "needs_review": []
     },
+    "text": "DEMO CAFE\nReceipt\nDate: 2026-11-14\nCoffee and lunch\nTOTAL: EUR 24.80\nThank you",
+    "raw_text": null,
+    "summary": null,
+    "text_status": "raw",
     "target_id": "json",
     "preview_id": "00000000-0000-4000-8000-000000000020",
     "can_confirm": true,
     "drafts": {
       "expenses": null,
-      "json": null
+      "json": null,
+      "text": null
     },
     "last_commit": null,
     "feedback": "JSON / EUR 24.80 / Confirm (fixture example only)",
+    "error": null
+  },
+  "PREVIEW_text": {
+    "v": 1,
+    "type": "SNAPSHOT",
+    "run_id": "00000000-0000-4000-8000-000000000001",
+    "state": "PREVIEW",
+    "source_mode": "fixture",
+    "capture_id": "00000000-0000-4000-8000-000000000002",
+    "receipt": null,
+    "text": "Meet at the library at 14:30.\nBring the blue notebook.\nKiitos!",
+    "raw_text": "Meet at the library at 14:30.\nBring the blue notebook.\nKiitos!",
+    "summary": "Meet at the library at 14:30 and bring the blue notebook.",
+    "text_status": "ready",
+    "target_id": "text",
+    "preview_id": "00000000-0000-4000-8000-000000000030",
+    "can_confirm": true,
+    "drafts": {
+      "expenses": null,
+      "json": null,
+      "text": null
+    },
+    "last_commit": null,
+    "feedback": "Text / drag right to paste (fixture example only)",
+    "error": null
+  },
+  "APPLIED_text": {
+    "v": 1,
+    "type": "SNAPSHOT",
+    "run_id": "00000000-0000-4000-8000-000000000001",
+    "state": "APPLIED",
+    "source_mode": "fixture",
+    "capture_id": "00000000-0000-4000-8000-000000000002",
+    "receipt": null,
+    "text": "Meet at the library at 14:30.\nBring the blue notebook.\nKiitos!",
+    "raw_text": "Meet at the library at 14:30.\nBring the blue notebook.\nKiitos!",
+    "summary": "Meet at the library at 14:30 and bring the blue notebook.",
+    "text_status": "ready",
+    "target_id": "text",
+    "preview_id": null,
+    "can_confirm": false,
+    "drafts": {
+      "expenses": null,
+      "json": null,
+      "text": {
+        "text": "Meet at the library at 14:30.\nBring the blue notebook.\nKiitos!",
+        "raw_text": "Meet at the library at 14:30.\nBring the blue notebook.\nKiitos!",
+        "summary": "Meet at the library at 14:30 and bring the blue notebook.",
+        "text_status": "ready"
+      }
+    },
+    "last_commit": {
+      "commit_id": "00000000-0000-4000-8000-000000000030",
+      "target_id": "text",
+      "display_status": "displayed"
+    },
+    "feedback": "Shown on Text (fixture example only).",
     "error": null
   },
   "APPLIED": {
@@ -149,6 +236,10 @@
       "tax_minor": null,
       "needs_review": []
     },
+    "text": "DEMO CAFE\nReceipt\nDate: 2026-11-14\nCoffee and lunch\nTOTAL: EUR 24.80\nThank you",
+    "raw_text": null,
+    "summary": null,
+    "text_status": "raw",
     "target_id": "json",
     "preview_id": null,
     "can_confirm": false,
@@ -161,7 +252,8 @@
         "currency": "EUR",
         "tax_minor": null,
         "needs_review": []
-      }
+      },
+      "text": null
     },
     "last_commit": {
       "commit_id": "00000000-0000-4000-8000-000000000020",
@@ -179,12 +271,17 @@
     "source_mode": "fixture",
     "capture_id": null,
     "receipt": null,
+    "text": null,
+    "raw_text": null,
+    "summary": null,
+    "text_status": "raw",
     "target_id": null,
     "preview_id": null,
     "can_confirm": false,
     "drafts": {
       "expenses": null,
-      "json": null
+      "json": null,
+      "text": null
     },
     "last_commit": null,
     "feedback": "Required fields unreadable. Recapture the receipt.",
